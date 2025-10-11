@@ -4,7 +4,7 @@
 
 import { logger, config } from '../../shared'
 import { generateImageWithRetry } from '../services/huggingface-service'
-import { translate } from '../services/lingo-service'
+import { translate } from '../services/free-translation-service'
 import type { Adapter, AdapterInput, AdapterOutput } from '../types'
 
 export class ImageAdapter implements Adapter {
@@ -53,10 +53,10 @@ export class ImageAdapter implements Adapter {
       
       // Post-processing: Translate back to original language if needed
       const targetLang = input.detectedLang || 'en'
-      if (config.lingoApiKey && targetLang !== 'en' && response.trim().length > 0) {
+      if (targetLang !== 'en' && response.trim().length > 0) {
         logger.info(`🌐 Translating image response back to ${targetLang}...`)
         try {
-          response = await translate(response, targetLang, { style: config.lingoStyle })
+          response = await translate(response, targetLang)
           logger.success(`✅ Image response translated to ${targetLang}`)
         } catch (error) {
           logger.warn('Image response translation failed, keeping English:', error)

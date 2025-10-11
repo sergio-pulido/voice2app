@@ -9,8 +9,8 @@ import type { AdapterInput, AdapterOutput } from './types'
 
 // Import STT functionality
 import { transcribeAudio } from '../planner'
-// Import Lingo translation
-import { normalizeInput } from './services/lingo-service'
+// Import free translation service
+import { normalizeInput } from './services/free-translation-service'
 
 /**
  * Main routing function
@@ -40,11 +40,19 @@ export async function routeRequest(input: AdapterInput): Promise<AdapterOutput> 
     textToProcess = String(textToProcess)
   }
   
-  // Step: Language detection and normalization (if Lingo is configured)
+  // Step: Detect intent first (using original text)
+  const intent = await detectIntent({
+    text: textToProcess,
+    userId: input.userId,
+    lang: 'en' // Will be updated after normalization if needed
+  })
+  
+  // Step: Language detection and normalization (skip for translate intent)
   let detectedLang = 'en'
   let normalizedText = textToProcess
   
-  if (config.lingoApiKey && textToProcess.trim().length > 0) {
+  // Skip normalization for translate intent - it needs the original language
+  if (intent.category !== 'translate' && textToProcess.trim().length > 0) {
     logger.info('🌍 Detecting language and normalizing input...')
     try {
       const lingoResult = await normalizeInput(textToProcess)
@@ -54,14 +62,9 @@ export async function routeRequest(input: AdapterInput): Promise<AdapterOutput> 
     } catch (error) {
       logger.warn('Language normalization failed, using original text:', error)
     }
+  } else if (intent.category === 'translate') {
+    logger.info('🌐 Skipping normalization for translation request - preserving original language')
   }
-  
-  // Detect intent using normalized text
-  const intent = await detectIntent({
-    text: normalizedText,
-    userId: input.userId,
-    lang: detectedLang
-  })
   
   const categoryName = getCategoryName(intent.category)
   const categoryEmoji = getCategoryEmoji(intent.category)
@@ -74,7 +77,8 @@ export async function routeRequest(input: AdapterInput): Promise<AdapterOutput> 
   // Update input with transcription and language info for adapters
   const adapterInput = {
     ...input,
-    text: normalizedText, // Use normalized text for processing
+    // For translate intent, use original text; for others, use normalized text
+    text: intent.category === 'translate' ? textToProcess : normalizedText,
     transcription,
     originalText: textToProcess, // Keep original for reference
     detectedLang

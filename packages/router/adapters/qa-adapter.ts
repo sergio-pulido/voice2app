@@ -4,7 +4,7 @@
 
 import { logger, config } from '../../shared'
 import { searchWeb, shouldUseWebSearch } from '../services/linkup-service'
-import { translate } from '../services/lingo-service'
+import { translate } from '../services/free-translation-service'
 import type { Adapter, AdapterInput, AdapterOutput } from '../types'
 
 export class QAAdapter implements Adapter {
@@ -84,10 +84,10 @@ export class QAAdapter implements Adapter {
       
       // Post-processing: Translate back to original language if needed
       const targetLang = input.detectedLang || 'en'
-      if (config.lingoApiKey && targetLang !== 'en' && responseText.trim().length > 0) {
+      if (targetLang !== 'en' && responseText.trim().length > 0) {
         logger.info(`🌐 Translating response back to ${targetLang}...`)
         try {
-          responseText = await translate(responseText, targetLang, { style: config.lingoStyle })
+          responseText = await translate(responseText, targetLang)
           logger.success(`✅ Response translated to ${targetLang}`)
         } catch (error) {
           logger.warn('Response translation failed, keeping English:', error)

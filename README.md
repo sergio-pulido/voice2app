@@ -8,10 +8,13 @@ You can build while walking, running, or hiking — completely hands-free.
 
 ## ✨ What's New
 
-### Latest Updates (v2.4 - October 2025)
+### Latest Updates (v2.5 - October 2025)
 
 **🚀 Major Improvements:**
 
+- 🌐 **Multi-Language Support**: MyMemory API integration with automatic language detection and translation
+- 🔄 **Auto-Translate Pipeline**: Detects language → translates to English for processing → translates response back to original language
+- 🗣️ **Translation Tool**: Dedicated adapter for explicit translation requests with 7+ pattern matching formats
 - 🧠 **Intelligent AI Router**: Groq LLM-powered intent classification with smart fallback - no keyword matching, always routes correctly!
 - 🎨 **Image Generation**: HuggingFace Stable Diffusion XL (1024x1024) with retry logic and smart error handling
 - 🔍 **Smart Q&A System**: Groq automatically assesses complexity - simple questions get instant answers, complex ones use Linkup web search
@@ -41,7 +44,9 @@ You can build while walking, running, or hiking — completely hands-free.
 - 🎯 See which AI tool was used for each request
 
 **For Customers**:
+- 🌐 Talk in ANY language - automatic translation to/from English
 - 💬 Natural voice interaction with voice responses
+- 🗣️ Built-in translation tool - "Translate 'text' to Spanish"
 - ⚡ Fast, intelligent responses - simple Q&A in 2-3 seconds
 - 🔍 Complex questions get comprehensive web-searched answers
 - 🎨 Generate high-quality 1024x1024 images with natural language prompts
@@ -84,18 +89,26 @@ bun run scripts/test-setup.ts
 ### Core Flow
 
 1. **Input (Telegram)**
-   - 🎤 **Voice messages**: Transcribed with ElevenLabs STT
+   - 🎤 **Voice messages**: Transcribed with ElevenLabs/OpenAI STT
    - 📝 **Text messages**: Direct processing
    - User sends via Telegram bot → Hookdeck tunnel → Local server
 
-2. **Processing Pipeline**
-   - **Step 1: Planner** - Transcribe (if voice) + Convert to structured task
-   - **Step 2: Codegen** - Generate app files with LLM (Groq/OpenAI/Anthropic)
-   - **Step 3: Runner** - Build, serve, screenshot with Playwright
-   - **Step 4: Analyzer** - AI-powered analysis and suggestions
-   - **Step 5: Notifier** - Deliver results to both channels
+2. **Translation & Routing Pipeline**
+   - **Step 1: Voice Transcription** - Convert voice to text (if needed)
+   - **Step 2: Language Detection** - Detect input language with smart heuristics
+   - **Step 3: Translation to English** - Normalize non-English input
+   - **Step 4: Intent Classification** - Groq AI Router determines tool (Q&A, App Builder, Image Gen, Video Gen, Translate)
+   - **Step 5: Tool Execution** - Selected adapter processes the request
+   - **Step 6: Response Translation** - Translate back to original language (if needed)
 
-3. **Output (Dual Channel)**
+3. **Tool-Specific Processing**
+   - **Q&A Adapter**: Groq complexity check → simple answer OR Linkup web search + enhanced answer
+   - **App Builder**: Codegen → Build → Screenshot → Analysis
+   - **Image Generator**: HuggingFace Stable Diffusion XL with retry logic
+   - **Video Generator**: Placeholder (future implementation)
+   - **Translator**: Pattern matching + LibreTranslate translation
+
+4. **Output (Dual Channel)**
    - **Telegram (Customer)**:
      - 🔊 Voice acknowledgment (if input was voice)
      - 🔊 Voice summary (truncated, ~30s)
@@ -111,24 +124,31 @@ bun run scripts/test-setup.ts
 ### Architecture Diagram
 
 ```
-Customer (Telegram)                        Admin (WhatsApp)
+Customer (Telegram)                        Admin (WhatsApp/Discord)
        ↓                                          ↓
    [Hookdeck Tunnel]                      [Hookdeck Tunnel]
        ↓                                          ↓
    localhost:3020/telegram                localhost:3020/vonage
        ↓                                          ↓
    ┌─────────────────────────────────────────────────┐
-   │              Orchestrator Pipeline              │
+   │              Main Processing Pipeline           │
    ├─────────────────────────────────────────────────┤
-   │ 1. STT (ElevenLabs/OpenAI)                      │
-   │ 2. Planner (Groq LLM)                           │
-   │ 3. Codegen (Groq/OpenAI/Anthropic)              │
-   │ 4. Runner (Bun + Playwright)                    │
-   │ 5. Analyzer (Groq LLM)                          │
+   │ 1. Voice Transcription (ElevenLabs/OpenAI)      │
+   │ 2. Language Detection (Smart Heuristics)        │
+   │ 3. Translation to English (if needed)           │
+   │ 4. AI Router (Groq LLM) - Intent Classification │
+   │    ├─ Q&A Adapter (Groq + Linkup)               │
+   │    ├─ App Builder (Codegen + Runner + Analysis) │
+   │    ├─ Image Generator (HuggingFace SDXL)        │
+   │    ├─ Video Generator (Coming Soon)             │
+   │    └─ Translator (MyMemory API)                 │
+   │ 5. Response Translation (back to original lang) │
+   │ 6. TTS (if voice input) + Notifier              │
    └─────────────────────────────────────────────────┘
        ↓                                          ↓
    Full Experience                         Admin Monitoring
-   (Voice/Text/Screenshot)                 (Metrics/Errors/Status)
+   (Voice/Text/Images)                     (Metrics/Errors/Status)
+   Translated to user's language           Tool usage tracking
 ```
 
 ---
@@ -146,6 +166,16 @@ The system uses **Groq LLM** to intelligently classify and route requests with h
 4. **Complexity Assessment**: For Q&A, Groq decides if web search is needed
 
 **Available Tools:**
+
+**🗣️ Translator** - Multi-language translation with MyMemory API:
+- **Explicit translation**: "Translate 'Hello world' to Spanish" → "Hola mundo"
+- **Multiple patterns supported**: "How do you say 'text' in French?", "Traduce 'texto' al inglés"
+- **Auto language detection**: Detects source language automatically
+- **7+ pattern matching formats**: Flexible input understanding
+- **Examples**:
+  - "Translate the next to Spanish: [German text]" ✅
+  - "How do you say 'Good morning' in French?" ✅
+  - "What is 'cat' in German?" ✅
 
 **💬 Q&A** - Intelligent question answering with AI-powered web search:
 - **Simple questions**: "What is the capital of Spain?" → Fast Groq answer (2-3 seconds)
@@ -172,14 +202,18 @@ The system uses **Groq LLM** to intelligently classify and route requests with h
 - "Generate an explainer video"
 
 **How It Works**:
-1. 🛡️ **Input Validation** - Safeguards check minimum length, content quality, word count
-2. 🧠 **Groq LLM Classification** (~500ms) - Intelligently determines intent (qa/app_code/image_gen/video_gen)
+1. 🎤 **Voice Transcription** - Convert voice to text (ElevenLabs/OpenAI)
+2. 🌐 **Language Detection** - LibreTranslate detects input language automatically
+3. 🔄 **Translation to English** - Non-English input normalized for better AI understanding
+4. 🛡️ **Input Validation** - Safeguards check minimum length, content quality, word count
+5. 🧠 **Groq LLM Classification** (~500ms) - Intelligently determines intent (qa/app_code/image_gen/video_gen/translate)
    - If Groq fails → Smart keyword fallback with 80%+ accuracy
-3. 🎯 **Smart Routing** - Always routes to the correct tool (95%+ accuracy)
-4. 🔍 **Complexity Assessment** (Q&A only) - Groq decides if web search is needed
-5. 📝 **Adaptive Responses** - Simple answers in 2-3s, complex answers with web search in 5-8s
-6. 🛡️ **Retry Logic** - Automatic retries for API failures with exponential backoff
-7. 🎨 **Tool Indicators** - Responses show which tool was used (**💬 Q&A**, **💻 App Builder**, etc.)
+6. 🎯 **Smart Routing** - Always routes to the correct tool (95%+ accuracy)
+7. 🔍 **Complexity Assessment** (Q&A only) - Groq decides if web search is needed
+8. 📝 **Tool Execution** - Adapter processes request in English
+9. 🌍 **Response Translation** - Translate back to original language (if non-English)
+10. 🛡️ **Retry Logic** - Automatic retries for API failures with exponential backoff
+11. 🎨 **Tool Indicators** - Responses show which tool was used (**💬 Q&A**, **🗣️ Translator**, etc.)
 
 ### 🎤 Voice-to-Voice Communication
 - **Intelligent Response Matching**: 
@@ -248,6 +282,13 @@ The system uses **Groq LLM** to intelligently classify and route requests with h
 **Image Generation**:
 - HuggingFace (stabilityai/stable-diffusion-xl-base-1.0) - 1024x1024 images with retry logic
 
+**Translation**:
+- MyMemory API (mymemory.translated.net) - Free, reliable translation API
+- Smart heuristic language detection (German, Spanish, French, Italian, Portuguese)
+- No API keys required
+- Handles long text with automatic chunking
+- Supports 50+ language pairs
+
 **Web Search**:
 - Linkup SDK - AI-powered search for complex Q&A
 
@@ -255,39 +296,56 @@ The system uses **Groq LLM** to intelligently classify and route requests with h
 
 ```
 1. Input Processing
-   └─ Voice: ElevenLabs STT transcription
+   └─ Voice: ElevenLabs/OpenAI STT transcription
    └─ Text: Direct processing
 
-2. AI Router (Intent Detection)
+2. Translation & Normalization
+   └─ Smart heuristics detect language
+   └─ If non-English → MyMemory API translates to English
+   └─ Normalized English text for better AI understanding
+
+3. AI Router (Intent Detection)
    └─ Input validation (length, content checks)
    └─ Groq LLM classification → Tool category
-   └─ Routes to: Q&A, App Builder, Image Gen, or Video Gen
+   └─ Routes to: Q&A, App Builder, Image Gen, Video Gen, or Translate
 
-3a. Q&A Path (Intelligent Search)
+4a. Q&A Path (Intelligent Search)
    └─ Step 1: Groq assesses complexity
    └─ Simple → Direct answer (2-3 sentences)
    └─ Complex → Step 2: Linkup web search
    └─ Step 3: Groq + search results → Detailed answer (up to 1000 tokens)
 
-3b. App Builder Path (Full Pipeline)
+4b. App Builder Path (Full Pipeline)
    └─ Task Planning (Groq LLM)
    └─ Code Generation (Groq/OpenAI/Anthropic)
    └─ Sandboxed Execution (Bun + Playwright)
    └─ AI Analysis (Groq LLM)
    └─ Screenshot capture
 
-3c. Image Generation Path
+4c. Image Generation Path
    └─ HuggingFace Stable Diffusion XL
    └─ Retry logic (3 attempts, 5s/10s/15s delays)
    └─ Generate 1024x1024 images
    └─ Save to artifacts/ directory
    └─ Return image with metadata
 
-3d. Video Generation Path
+4d. Video Generation Path
    └─ Coming soon
 
-4. Dual Delivery
-   └─ Telegram: Full customer experience (voice/text + screenshots)
+4e. Translation Path
+   └─ Pattern matching (7+ formats)
+   └─ Extract source text + target language
+   └─ Smart language detection with heuristics
+   └─ MyMemory API translation (with chunking for long text)
+   └─ Return translated text with metadata
+
+5. Response Translation
+   └─ If original input was non-English
+   └─ Translate response back to original language
+   └─ Preserve formatting and structure
+
+6. Dual Delivery
+   └─ Telegram: Full customer experience (voice/text + images)
    └─ Discord/WhatsApp: Admin monitoring (metrics, tool used, status)
 ```
 
@@ -299,7 +357,8 @@ The system uses **Groq LLM** to intelligently classify and route requests with h
 |---------------|----------------|
 | **Gateway**       | Hono + Bun, dual webhook endpoints |
 | **Tunneling**     | Hookdeck CLI (localhost development) |
-| **AI Router**     | Groq LLM classification with smart fallback → 4 tools |
+| **Translation**   | MyMemory API (free, reliable, smart detection, chunking) |
+| **AI Router**     | Groq LLM classification with smart fallback → 5 tools |
 | **Web Search**    | Linkup SDK (AI-powered search triggered by Groq) |
 | **Image Gen**     | HuggingFace Stable Diffusion XL (1024x1024 PNG) with retry logic |
 | **STT**           | ElevenLabs (scribe_v1) + OpenAI Whisper |
@@ -409,14 +468,17 @@ voice2app/
     router/                  # AI Router & Multi-Tool System
       ├── intent-router.ts  # Intent detection & classification
       ├── types.ts          # Router interfaces
-      ├── index.ts          # Main router entry
+      ├── index.ts          # Main router entry (with translation pipeline)
       ├── adapters/
       │   ├── qa-adapter.ts       # Q&A with Linkup + LLM
       │   ├── app-code-adapter.ts # App building (wraps pipeline)
-      │   ├── image-adapter.ts    # Image generation (placeholder)
-      │   └── video-adapter.ts    # Video generation (placeholder)
+      │   ├── image-adapter.ts    # Image generation (HuggingFace)
+      │   ├── video-adapter.ts    # Video generation (placeholder)
+      │   └── translate-adapter.ts# Translation requests
       └── services/
-          └── linkup-service.ts   # Web search integration
+          ├── linkup-service.ts   # Web search integration
+          ├── huggingface-service.ts # Image generation
+          └── free-translation-service.ts # MyMemory API
     
     planner/                 # STT + Task Planning
       ├── index.ts          # Main entry point
@@ -504,6 +566,9 @@ LINKUP_API_KEY=your_linkup_api_key          # For web search - get from linkup.s
 
 # Image Generation (optional)
 HUGGINGFACE_API_KEY=your_huggingface_api_key  # For image generation - get from huggingface.co
+
+# Translation (built-in, no API key needed!)
+# Uses MyMemory free API - smart language detection + reliable translation
 
 # Admin Notifications (choose one or both)
 ENABLE_DISCORD_ADMIN=true                    # Recommended (free, unlimited)
@@ -820,6 +885,27 @@ Simplified local development:
 ---
 
 ## 📚 Examples
+
+### 🌐 Translation Examples
+
+**Explicit Translation Requests**:
+> 📝 "Translate 'Hello world' to Spanish"  
+> Response: "Hola mundo"
+
+> 📝 "How do you say 'Good morning' in French?"  
+> Response: "Bonjour"
+
+> 📝 "Translate the next to Spanish: Frau Meier geht heute..."  
+> Response: [Full German text translated to Spanish]
+
+**Multi-Language Input** (Automatic):
+> 📝 "¿Cuál es la capital de España?" (Spanish)  
+> System: Detects Spanish → Translates to English → Routes to Q&A → Translates back to Spanish  
+> Response: "La capital de España es Madrid..." (in Spanish)
+
+> 🎤 Voice in German: "Erstelle eine Webseite..."  
+> System: STT → Detect German → Translate to English → Build app → Response in German  
+> Response: "Die App wurde erfolgreich erstellt..." (in German)
 
 ### Q&A Examples
 

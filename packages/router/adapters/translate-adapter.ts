@@ -3,7 +3,7 @@
  */
 
 import { logger, config } from '../../shared'
-import { translate, detectLanguage } from '../services/lingo-service'
+import { translate, detectLanguage } from '../services/free-translation-service'
 import type { Adapter, AdapterInput, AdapterOutput } from '../types'
 
 export class TranslateAdapter implements Adapter {
@@ -15,24 +15,7 @@ export class TranslateAdapter implements Adapter {
     try {
       const prompt = String(input.transcription || input.text || '')
       
-      // Check if Lingo is configured
-      if (!config.lingoApiKey) {
-        return {
-          summaryText: 
-            `🌐 **Translation Service**\n\n` +
-            `To translate text, you need to configure Lingo:\n\n` +
-            `1. Get an API key from lingo.dev\n` +
-            `2. Add to .env: LINGODEV_API_KEY=your_key\n` +
-            `3. Restart the server\n\n` +
-            `Then I'll be able to translate text between languages!`,
-          ttsText: `Lingo API key not configured. Add it to your environment to enable translation.`,
-          metadata: {
-            category: 'translate',
-            processingTime: Date.now() - startTime,
-            status: 'partial'
-          }
-        }
-      }
+      // Using free translation service - no API key needed
       
       logger.debug(`Translation request: "${prompt}"`)
       
@@ -63,7 +46,7 @@ export class TranslateAdapter implements Adapter {
       
       // Translate the text
       logger.info(`🌐 Translating from ${detectedLang} to ${targetLang}...`)
-      const translatedText = await translate(sourceText, targetLang, { style: config.lingoStyle })
+      const translatedText = await translate(sourceText, targetLang)
       
       const processingTime = Date.now() - startTime
       
@@ -76,10 +59,10 @@ export class TranslateAdapter implements Adapter {
       
       // Post-processing: Translate response back to original language if needed
       const originalLang = input.detectedLang || 'en'
-      if (config.lingoApiKey && originalLang !== 'en' && response.trim().length > 0) {
+      if (originalLang !== 'en' && response.trim().length > 0) {
         logger.info(`🌐 Translating response back to ${originalLang}...`)
         try {
-          response = await translate(response, originalLang, { style: config.lingoStyle })
+          response = await translate(response, originalLang)
           logger.success(`✅ Translation response translated to ${originalLang}`)
         } catch (error) {
           logger.warn('Translation response translation failed, keeping English:', error)
@@ -174,6 +157,26 @@ export class TranslateAdapter implements Adapter {
     match = prompt.match(whatPattern)
     if (match) {
       return { sourceText: match[1].trim(), targetLang: this.normalizeLanguage(match[2]) }
+    }
+    
+    // Pattern 6: "Translate this to language:" (followed by text)
+    const thisPattern = /translate\s+this\s+to\s+(\w+):\s*(.+)/is
+    match = prompt.match(thisPattern)
+    if (match) {
+      const textToTranslate = match[2].trim()
+      if (textToTranslate.length > 10) {
+        return { sourceText: textToTranslate, targetLang: this.normalizeLanguage(match[1]) }
+      }
+    }
+    
+    // Pattern 7: "Translate the following to language:" (followed by text)
+    const followingPattern = /translate\s+the\s+following\s+to\s+(\w+):\s*(.+)/is
+    match = prompt.match(followingPattern)
+    if (match) {
+      const textToTranslate = match[2].trim()
+      if (textToTranslate.length > 10) {
+        return { sourceText: textToTranslate, targetLang: this.normalizeLanguage(match[1]) }
+      }
     }
     
     return { sourceText: '', targetLang: '' }
