@@ -4,7 +4,7 @@
 
 import { logger, config } from '../shared'
 import { detectIntent, getCategoryName, getCategoryEmoji, type IntentCategory } from './intent-router'
-import { qaAdapter, appCodeAdapter, imageAdapter, videoAdapter, translateAdapter } from './adapters'
+import { qaAdapter, appCodeAdapter, imageAdapter, videoAdapter, translateAdapter, helpAdapter } from './adapters'
 import type { AdapterInput, AdapterOutput } from './types'
 
 // Import STT functionality
@@ -85,6 +85,10 @@ export async function routeRequest(input: AdapterInput): Promise<AdapterOutput> 
   }
   
   switch (intent.category) {
+    case 'help':
+      result = await helpAdapter.run(adapterInput)
+      break
+      
     case 'qa':
       result = await qaAdapter.run(adapterInput)
       break
@@ -106,9 +110,9 @@ export async function routeRequest(input: AdapterInput): Promise<AdapterOutput> 
       break
       
     default:
-      // Fallback to app code
-      logger.warn(`Unknown category: ${intent.category}, falling back to app_code`)
-      result = await appCodeAdapter.run(adapterInput)
+      // Fallback to Q&A (safest default)
+      logger.warn(`Unknown category: ${intent.category}, falling back to Q&A`)
+      result = await qaAdapter.run(adapterInput)
   }
   
   // Add routing metadata

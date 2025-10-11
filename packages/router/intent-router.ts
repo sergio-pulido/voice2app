@@ -4,7 +4,7 @@
 
 import { logger } from '../shared'
 
-export type IntentCategory = 'qa' | 'app_code' | 'image_gen' | 'video_gen' | 'translate'
+export type IntentCategory = 'qa' | 'app_code' | 'image_gen' | 'video_gen' | 'translate' | 'help'
 
 export interface IntentResult {
   category: IntentCategory
@@ -63,6 +63,21 @@ function fastClassify(text: string): IntentResult | null {
     'crea video', 'genera video', 'haz video',
     'vídeo corto', 'short video', 'clip'
   ]
+  
+  // Help keywords (check FIRST to avoid false positives)
+  const helpKeywords = [
+    'what can you do', 'what do you do', 'qué puedes hacer',
+    'help', 'ayuda', 'ajuda', 'capabilities', 'capacidades',
+    'how to use', 'cómo usar', 'how does this work',
+    'what are your features', 'what features', 'qué características',
+    'show me what you can do', 'muéstrame qué puedes hacer'
+  ]
+  
+  for (const keyword of helpKeywords) {
+    if (lowerText.includes(keyword)) {
+      return { category: 'help', confidence: 0.95 }
+    }
+  }
   
   // Translation keywords
   const translateKeywords = [
@@ -241,22 +256,25 @@ async function groqClassify(text: string): Promise<IntentResult> {
               role: 'system',
               content: `You are an intent classifier. Classify the user's request into ONE of these categories:
 
-1. "qa" - Questions, explanations, information requests
+1. "help" - Asking about capabilities, features, or how to use the system
+   Examples: "What can you do?", "Help", "What are your features?", "How do I use this?"
+
+2. "qa" - Questions, explanations, information requests
    Examples: "What is X?", "Explain Y", "Tell me about Z", "How does X work?"
 
-2. "app_code" - Building apps, websites, components, code
+3. "app_code" - Building apps, websites, components, code
    Examples: "Create a counter app", "Build a landing page", "Make a todo list"
 
-3. "image_gen" - Generating images, logos, illustrations
+4. "image_gen" - Generating images, logos, illustrations
    Examples: "Generate a logo", "Create an image of X", "Draw a picture", "I want an image of X"
 
-4. "video_gen" - Generating videos, clips, animations
+5. "video_gen" - Generating videos, clips, animations
    Examples: "Create a video", "Make a clip", "Generate video about X"
 
-5. "translate" - Translation requests
+6. "translate" - Translation requests
    Examples: "Translate 'Hello' to Spanish", "How do you say 'Good morning' in French?", "What is 'cat' in German?"
 
-Respond with ONLY ONE WORD: qa, app_code, image_gen, video_gen, or translate
+Respond with ONLY ONE WORD: help, qa, app_code, image_gen, video_gen, or translate
 
 Default to "qa" if uncertain.`
             },
@@ -285,7 +303,7 @@ Default to "qa" if uncertain.`
       const result = data.choices[0]?.message?.content?.trim().toLowerCase() || 'qa'
       
       // Validate the response
-      const validCategories: IntentCategory[] = ['qa', 'app_code', 'image_gen', 'video_gen', 'translate']
+      const validCategories: IntentCategory[] = ['help', 'qa', 'app_code', 'image_gen', 'video_gen', 'translate']
       const category = validCategories.includes(result as IntentCategory) 
         ? result as IntentCategory 
         : 'qa'
@@ -350,6 +368,7 @@ export async function detectIntent(input: RouterInput): Promise<IntentResult> {
  */
 export function getCategoryName(category: IntentCategory): string {
   const names: Record<IntentCategory, string> = {
+    'help': '❓ Help',
     'qa': '💬 Q&A',
     'app_code': '💻 App Builder',
     'image_gen': '🎨 Image Generator',
@@ -364,6 +383,7 @@ export function getCategoryName(category: IntentCategory): string {
  */
 export function getCategoryEmoji(category: IntentCategory): string {
   const emojis: Record<IntentCategory, string> = {
+    'help': '❓',
     'qa': '💬',
     'app_code': '💻',
     'image_gen': '🎨',
