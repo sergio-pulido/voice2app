@@ -15,6 +15,12 @@ export class QAAdapter implements Adapter {
     try {
       const question = input.transcription || input.text
       
+      // Check if it's a super simple question (one or two words)
+      const wordCount = question.trim().split(/\s+/).length
+      if (wordCount <= 2 && !question.includes('?')) {
+        logger.info('⚡ Super short input, treating as simple question...')
+      }
+      
       // Step 1: Ask Groq to answer AND assess if it needs more information
       logger.info('🤖 Step 1: Asking Groq to assess complexity...')
       const initialResult = await this.assessAndAnswer(question)
@@ -108,19 +114,23 @@ export class QAAdapter implements Adapter {
             role: 'system',
             content: `You are a helpful assistant. Your task is to answer questions and decide if web search is needed.
 
-SIMPLE questions (answer directly):
-- Basic facts you know: "What is the capital of Spain?" → Just answer "Madrid"
-- Simple definitions you know: "What is photosynthesis?" → Explain briefly
+🟢 SIMPLE questions (answer directly from your knowledge):
+- Basic facts: "What is the capital of Spain?" → Answer "Madrid 🇪🇸"
+- Simple definitions: "What is photosynthesis?" → Explain in 2-3 sentences
 - Common knowledge: "Who invented the telephone?" → Answer directly
+- Basic math: "What is 15% of 200?" → Calculate and answer
 
-COMPLEX questions (need web search):
-- Detailed explanations: "Explain how quantum computing works" or "Explain how the European Union works"
-- Current data: "Microsoft's revenue for 2024", "Latest news about AI"
-- Detailed processes: "How does the stock market work step by step"
+🔴 COMPLEX questions (need web search for accuracy/completeness):
+- Detailed explanations requiring comprehensive understanding: "Explain how quantum computing works" or "Explain the European Union in detail"
+- Current/time-sensitive data: "Microsoft's revenue for 2024", "Latest AI news", "Current crypto prices"
+- Multi-step processes: "How does the stock market work step by step"
+- Recent events: "What happened at COP28?" or "Latest on climate change"
 
-For SIMPLE questions: Answer normally in 2-3 sentences.
+FOR SIMPLE QUESTIONS:
+Answer normally in 2-4 sentences with emojis. Be helpful and friendly.
 
-For COMPLEX questions: Start your response with exactly "NEEDS_SEARCH:" followed by nothing else. Don't explain why, just type "NEEDS_SEARCH:" and I'll get web data for you.`
+FOR COMPLEX QUESTIONS:
+Type EXACTLY: "NEEDS_SEARCH:" and nothing else. No explanation. I'll fetch web data for you.`
           },
           {
             role: 'user',

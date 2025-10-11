@@ -1,8 +1,9 @@
 /**
- * Image Generation Adapter
+ * Image Generation Adapter - HuggingFace Integration
  */
 
-import { logger } from '../../shared'
+import { logger, config } from '../../shared'
+import { generateImageWithRetry } from '../services/huggingface-service'
 import type { Adapter, AdapterInput, AdapterOutput } from '../types'
 
 export class ImageAdapter implements Adapter {
@@ -13,38 +14,71 @@ export class ImageAdapter implements Adapter {
     const prompt = input.transcription || input.text
     
     try {
-      // TODO: Integrate with HuggingFace or other image generation API
-      // For now, return a placeholder message
+      // Check if HuggingFace is configured
+      if (!config.huggingfaceApiKey) {
+        return {
+          summaryText: 
+            `🎨 **Image Generation**\n\n` +
+            `To generate images, you need to configure HuggingFace:\n\n` +
+            `1. Get a free API key from huggingface.co\n` +
+            `2. Add to .env: HUGGINGFACE_API_KEY=your_key\n` +
+            `3. Restart the server\n\n` +
+            `Then I'll be able to generate images from your descriptions!`,
+          ttsText: `HuggingFace API key not configured. Add it to your environment to enable image generation.`,
+          metadata: {
+            category: 'image_gen',
+            processingTime: Date.now() - startTime,
+            status: 'partial'
+          }
+        }
+      }
       
       logger.debug(`Image prompt: "${prompt}"`)
       
-      // Placeholder response
-      const response = 
-        `🎨 **Image Generation Request**\n\n` +
-        `Prompt: "${prompt}"\n\n` +
-        `This feature is coming soon! Once integrated, you'll be able to:\n` +
-        `• Generate images from text descriptions\n` +
-        `• Create logos, illustrations, and designs\n` +
-        `• Get high-quality AI-generated visuals\n\n` +
-        `💡 For now, try asking me to build an app instead!`
+      // Generate image with HuggingFace
+      const imagePath = await generateImageWithRetry(prompt)
+      
+      if (!imagePath) {
+        throw new Error('Failed to generate image after retries')
+      }
       
       const processingTime = Date.now() - startTime
       
+      // Build response message
+      const response = 
+        `🎨 **Image Generated!**\n\n` +
+        `Prompt: "${prompt}"\n\n` +
+        `Your AI-generated image is ready! ✨\n\n` +
+        `Generated with: Stable Diffusion XL\n` +
+        `Time: ${(processingTime / 1000).toFixed(1)}s`
+      
       return {
         summaryText: response,
-        ttsText: `Image generation feature is coming soon. Try asking me to build an app instead!`,
+        ttsText: `Image generated successfully for: ${prompt.substring(0, 50)}`,
+        attachments: [imagePath],
         metadata: {
           category: 'image_gen',
           processingTime,
-          status: 'partial',
-          prompt
+          status: 'success',
+          prompt,
+          model: 'stable-diffusion-xl-base-1.0'
         }
       }
     } catch (error) {
       logger.error('Image adapter error:', error)
       
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      
       return {
-        summaryText: `❌ Image generation error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        summaryText: 
+          `❌ **Image Generation Failed**\n\n` +
+          `Prompt: "${prompt}"\n\n` +
+          `Error: ${errorMessage}\n\n` +
+          `💡 This might be due to:\n` +
+          `• HuggingFace API rate limits\n` +
+          `• Model loading (try again in 30 seconds)\n` +
+          `• Invalid prompt\n\n` +
+          `Please try again or try a different prompt!`,
         metadata: {
           category: 'image_gen',
           processingTime: Date.now() - startTime,

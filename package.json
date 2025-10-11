@@ -10,6 +10,7 @@
     "test-setup": "bun run scripts/test-setup.ts"
   },
   "dependencies": {
+    "@huggingface/inference": "^4.11.1",
     "hono": "^4.0.0",
     "linkup-sdk": "^2.4.1",
     "playwright": "^1.40.0"

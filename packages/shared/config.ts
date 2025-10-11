@@ -11,6 +11,7 @@ export const config = {
   groqApiKey: process.env.GROQ_API_KEY || '',
   elevenlabsApiKey: process.env.ELEVENLABS_API_KEY || '',
   linkupApiKey: process.env.LINKUP_API_KEY || '',
+  huggingfaceApiKey: process.env.HUGGINGFACE_API_KEY || '',
   
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',
   telegramAdminChatId: process.env.TELEGRAM_ADMIN_CHAT_ID || '',

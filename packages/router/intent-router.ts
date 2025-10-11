@@ -48,12 +48,13 @@ function fastClassify(text: string): IntentResult | null {
     'hacer una página', 'crear página'
   ]
   
-  // Image generation keywords
+  // Image generation keywords (be very specific to avoid false positives)
   const imageKeywords = [
-    'create image', 'generate image', 'make image', 'create an image',
+    'generate image', 'create image', 'make image',
+    'generate a logo', 'create a logo', 'make a logo', 'design a logo',
+    'generate illustration', 'create illustration',
     'crea imagen', 'genera imagen', 'diseña imagen',
-    'logo', 'icon', 'illustration', 'ilustración',
-    'draw', 'dibuja', 'picture', 'foto', 'of a mountain', 'of a'
+    'draw a', 'dibuja un', 'dibuja una'
   ]
   
   // Video generation keywords
@@ -116,11 +117,120 @@ async function llmClassify(text: string): Promise<IntentResult> {
     }
   }
   
-  // Default to app_code (this is our main use case)
+  // If uncertain, default to Q&A (safest option - won't break things)
   return {
-    category: 'app_code',
-    confidence: 0.6,
-    reasoning: 'Default to app building'
+    category: 'qa',
+    confidence: 0.5,
+    reasoning: 'Default to Q&A (can handle any text)'
+  }
+}
+
+/**
+ * Validate and sanitize input
+ */
+function validateInput(text: string): { valid: boolean; reason?: string; cleaned: string } {
+  // Remove extra whitespace
+  const cleaned = text.trim().replace(/\s+/g, ' ')
+  
+  // Check minimum length (at least 2 words or 3 characters)
+  if (cleaned.length < 3) {
+    return { valid: false, reason: 'Input too short', cleaned }
+  }
+  
+  // Check if it's just emojis or special characters
+  if (!/[a-zA-Z0-9áéíóúñÁÉÍÓÚÑ]/.test(cleaned)) {
+    return { valid: false, reason: 'No valid text content', cleaned }
+  }
+  
+  // Check word count (at least 1 meaningful word)
+  const words = cleaned.split(' ').filter(w => w.length > 0)
+  if (words.length === 0) {
+    return { valid: false, reason: 'No words found', cleaned }
+  }
+  
+  return { valid: true, cleaned }
+}
+
+/**
+ * Use Groq to intelligently classify the request
+ */
+async function groqClassify(text: string): Promise<IntentResult> {
+  const apiKey = require('../shared/config').config.groqApiKey || require('../shared/config').config.openaiApiKey
+  
+  if (!apiKey) {
+    logger.warn('No LLM API key for classification, using fallback')
+    return llmClassify(text)
+  }
+  
+  const isGroq = !!require('../shared/config').config.groqApiKey
+  const url = isGroq 
+    ? 'https://api.groq.com/openai/v1/chat/completions'
+    : 'https://api.openai.com/v1/chat/completions'
+  
+  const model = isGroq ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini'
+  
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: 'system',
+            content: `You are an intent classifier. Classify the user's request into ONE of these categories:
+
+1. "qa" - Questions, explanations, information requests
+   Examples: "What is X?", "Explain Y", "Tell me about Z", "How does X work?"
+
+2. "app_code" - Building apps, websites, components, code
+   Examples: "Create a counter app", "Build a landing page", "Make a todo list"
+
+3. "image_gen" - Generating images, logos, illustrations
+   Examples: "Generate a logo", "Create an image of X", "Draw a picture"
+
+4. "video_gen" - Generating videos, clips, animations
+   Examples: "Create a video", "Make a clip", "Generate video about X"
+
+Respond with ONLY ONE WORD: qa, app_code, image_gen, or video_gen
+
+Default to "qa" if uncertain.`
+          },
+          {
+            role: 'user',
+            content: text
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 10
+      })
+    })
+    
+    if (!response.ok) {
+      logger.warn('Groq classification failed, using fallback')
+      return llmClassify(text)
+    }
+    
+    const data = await response.json()
+    const result = data.choices[0]?.message?.content?.trim().toLowerCase() || 'qa'
+    
+    // Validate the response
+    const validCategories: IntentCategory[] = ['qa', 'app_code', 'image_gen', 'video_gen']
+    const category = validCategories.includes(result as IntentCategory) 
+      ? result as IntentCategory 
+      : 'qa'
+    
+    return {
+      category,
+      confidence: 0.95,
+      reasoning: 'Groq LLM classification'
+    }
+  } catch (error) {
+    logger.warn('Groq classification error, using fallback:', error)
+    return llmClassify(text)
   }
 }
 
@@ -130,26 +240,28 @@ async function llmClassify(text: string): Promise<IntentResult> {
 export async function detectIntent(input: RouterInput): Promise<IntentResult> {
   logger.debug(`🧠 Detecting intent for: "${input.text.substring(0, 50)}..."`)
   
-  // Try fast classification first
-  const fastResult = fastClassify(input.text)
+  // Step 1: Validate and sanitize input
+  const validation = validateInput(input.text)
   
-  if (fastResult && fastResult.confidence >= 0.8) {
-    logger.info(`🎯 Fast classification: ${fastResult.category} (confidence: ${fastResult.confidence})`)
-    return fastResult
+  if (!validation.valid) {
+    logger.warn(`⚠️  Invalid input: ${validation.reason}`)
+    // Return Q&A as safe default for invalid input
+    return {
+      category: 'qa',
+      confidence: 0.5,
+      reasoning: `Invalid input: ${validation.reason}`
+    }
   }
   
-  // Fallback to LLM classification
-  logger.debug('🤔 Using LLM classification...')
-  const llmResult = await llmClassify(input.text)
+  const cleanedText = validation.cleaned
   
-  logger.info(`🎯 LLM classification: ${llmResult.category} (confidence: ${llmResult.confidence})`)
+  // Step 2: Use Groq for intelligent classification
+  logger.info('🤖 Using Groq for intelligent intent classification...')
+  const groqResult = await groqClassify(cleanedText)
   
-  // If confidence is too low, ask for clarification
-  if (llmResult.confidence < 0.6) {
-    logger.warn('⚠️  Low confidence, may need clarification')
-  }
+  logger.info(`🎯 Groq classified as: ${groqResult.category} (confidence: ${groqResult.confidence})`)
   
-  return llmResult
+  return groqResult
 }
 
 /**

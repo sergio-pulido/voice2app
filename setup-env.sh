@@ -19,6 +19,9 @@ ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
 # Q&A Enhancement (optional - for web search)
 LINKUP_API_KEY=your_linkup_api_key_here
 
+# Image Generation (optional)
+HUGGINGFACE_API_KEY=your_huggingface_api_key_here
+
 # Provider Selection
 STT_PROVIDER=elevenlabs
 LLM_PROVIDER=groq
@@ -56,8 +59,9 @@ echo "• TELEGRAM_BOT_TOKEN: From @BotFather on Telegram"
 echo "• GROQ_API_KEY: From console.groq.com (free tier available)"
 echo "• ELEVENLABS_API_KEY: From elevenlabs.io (for voice features)"
 echo ""
-echo "📋 Optional (Enhanced Q&A):"
+echo "📋 Optional (Enhanced Features):"
 echo "• LINKUP_API_KEY: From linkup.so (for web search in Q&A)"
+echo "• HUGGINGFACE_API_KEY: From huggingface.co (for image generation)"
 echo ""
 echo "📋 Optional (Admin Notifications):"
 echo "• DISCORD_WEBHOOK_URL: Discord Server Settings → Integrations → Webhooks (FREE!)"

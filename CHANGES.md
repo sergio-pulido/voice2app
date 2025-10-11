@@ -1,8 +1,58 @@
 # 🎉 Voice2App - Changelog
 
+## 🚀 Version 2.2 - Linkup Integration & Discord Admin (October 11, 2025)
+
+### 🔍 **NEW: Intelligent Q&A with Linkup**
+
+**Smart Web Search Integration**:
+- Groq LLM **decides** when to use web search (not keyword-based!)
+- **Simple questions** → Groq only (fast, 2-3 sentences)
+- **Complex questions** → Linkup searches + Groq generates detailed answer (up to 1000 tokens!)
+- Web search indicator shown: "🔍 Answer enhanced with web search"
+
+**New Files**:
+- `packages/router/services/linkup-service.ts` - Linkup SDK integration
+- Updated `packages/router/adapters/qa-adapter.ts` - 3-step intelligent Q&A
+
+**How It Works**:
+1. Groq assesses question complexity
+2. If complex → Linkup searches web
+3. Groq synthesizes comprehensive answer with search results
+
+### 📢 **NEW: Discord Admin Support**
+
+**Why Discord > WhatsApp**:
+- ✅ Free, unlimited messages (no rate limits!)
+- ✅ Rich embeds with colors and formatting
+- ✅ Team collaboration (multiple admins)
+- ✅ Persistent message history
+- ✅ Saves ~$600-1200/year vs WhatsApp
+
+**New Files**:
+- `packages/shared/discord-admin.ts` - Discord webhook integration
+- `docs/DISCORD_ADMIN.md` - Complete Discord setup guide
+- `env.template` - Environment variable template
+
+**Configuration**:
+```env
+ENABLE_WHATSAPP_ADMIN=false  # Disable to avoid rate limits
+ENABLE_DISCORD_ADMIN=true    # Free & unlimited!
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
+```
+
+### Improvements
+
+- ✅ Fixed title formatting (no double emojis)
+- ✅ Groq-powered complexity assessment (smarter than keywords)
+- ✅ Adaptive answer length (short for simple, detailed for complex)
+- ✅ Better error handling for rate limits
+- ✅ Logs moved to `logs/` directory
+
+---
+
 ## 🚀 Version 2.1 - AI Router & Multi-Tool Support (October 11, 2025)
 
-### 🧠 **NEW: AI Router System**
+### 🧠 **AI Router System**
 
 Added intelligent intent detection and routing to support multiple types of requests:
 

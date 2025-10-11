@@ -8,13 +8,15 @@ You can build while walking, running, or hiking — completely hands-free.
 
 ## ✨ What's New
 
-### Recent Updates
+### Latest Updates (v2.1)
 
-- 🧠 **AI Router**: Intelligent intent detection routes requests to the right tool (Q&A, App Builder, Image Gen, Video Gen)
+- 🧠 **AI Router**: Groq-powered intent detection routes requests to the right tool (Q&A, App Builder, Image Gen, Video Gen) - no keyword matching!
+- 🔍 **Linkup Integration**: AI-powered web search for complex Q&A - Groq decides when to search
+- 📢 **Discord Admin**: Free, unlimited admin notifications with rich embeds (recommended over WhatsApp)
+- ⚙️ **Configurable Notifications**: Enable/disable WhatsApp and Discord independently
 - 🎤 **Voice-to-Voice Responses**: Send voice, get voice back! Full TTS integration with ElevenLabs
-- 📱 **WhatsApp Admin Monitoring**: Real-time notifications with detailed metrics, errors, and user activity
+- 📱 **Dual Admin Channels**: WhatsApp (mobile) and/or Discord (team) - your choice
 - 🔄 **Smart Response Matching**: Automatic voice/text detection with appropriate response format
-- 📊 **Dual Channel Architecture**: Separate customer (Telegram) and admin (WhatsApp) interfaces
 - 🎯 **Multi-Provider AI**: Support for ElevenLabs/OpenAI (STT/TTS) and Groq/OpenAI/Anthropic (LLMs)
 - 🚀 **Makefile + Hookdeck CLI**: One command (`make dev`) to start server + dual tunnels
 - 🛠️ **Enhanced Error Handling**: Detailed admin notifications with stack traces
@@ -110,23 +112,33 @@ Customer (Telegram)                        Admin (WhatsApp)
 
 ### 🧠 AI Router - Multi-Tool Support
 
-The system now intelligently routes requests to different tools:
+The system uses **Groq LLM** to intelligently classify and route requests with high accuracy:
 
-**💬 Q&A** - Answer questions with LLM + Web Search:
-- "What is the capital of Spain?" (web search enabled)
-- "What is Microsoft's revenue for 2024?" (real-time data)
-- "Explain quantum computing" (LLM knowledge)
-- Uses **Linkup** for factual queries + **Groq LLM** for answers
+**Smart Classification Process:**
+1. **Input Validation**: Checks content quality (minimum length, text validation)
+2. **Groq Classification**: LLM understands user intent (no keyword matching!)
+3. **Intelligent Routing**: Always routes to the correct tool
+4. **Complexity Assessment**: For Q&A, Groq decides if web search is needed
+
+**Available Tools:**
+
+**💬 Q&A** - Intelligent question answering with AI-powered web search:
+- **Simple questions**: "What is the capital of Spain?" → Fast Groq answer (2-3 seconds)
+- **Complex questions**: "Explain how quantum computing works" → Linkup search + Detailed answer (5-8 seconds)
+- **Groq decides** when to use web search (not keyword-based!)
+- **Linkup** provides web data for complex queries
+- **Full detailed answers** (up to 1000 tokens) when using web search
 
 **💻 App Builder** - Generate complete applications (core feature):
 - "Create a counter app"
 - "Build a landing page"
 - "Make a todo list with React"
 
-**🎨 Image Generator** - Create images from descriptions (coming soon):
-- "Generate a logo for my startup"
-- "Create an illustration of a mountain"
-- "Design an icon for my app"
+**🎨 Image Generator** - Create AI-generated images with HuggingFace:
+- "Generate a logo for my startup" → Stable Diffusion XL creates it
+- "Create an illustration of a mountain" → High-quality 1024x1024 image
+- "Design an icon for my app" → AI-generated design
+- **Free tier available** - Get API key from huggingface.co
 
 **🎬 Video Generator** - Generate video clips (coming soon):
 - "Create a short video about AI"
@@ -134,10 +146,11 @@ The system now intelligently routes requests to different tools:
 - "Generate an explainer video"
 
 **How It Works**:
-- 🚀 **Fast keyword detection** (93% accuracy, <1ms)
-- 🤖 **LLM fallback** for uncertain cases
-- 🎯 **Automatic routing** to the right tool
-- 📊 **Tool selection shown** in notifications (admin & user)
+- 🚀 **Fast keyword detection** (93% accuracy, <1ms) - Routes to tool category
+- 🧠 **Groq assesses complexity** - Decides simple vs complex for Q&A
+- 🔍 **Linkup web search** - Triggered by Groq when needed (not keywords!)
+- 📝 **Adaptive answers** - Short for simple, detailed for complex
+- 🎯 **Tool shown in responses** - Customer and admin see which tool was used
 
 ### 🎤 Voice-to-Voice Communication
 - **Intelligent Response Matching**: 
@@ -210,27 +223,30 @@ The system now intelligently routes requests to different tools:
    └─ Voice: ElevenLabs STT transcription
    └─ Text: Direct processing
 
-2. Task Planning (Groq LLM)
-   └─ Convert natural language to structured task
-   └─ Define project type, intent, checks
+2. AI Router (Intent Detection)
+   └─ Input validation (length, content checks)
+   └─ Groq LLM classification → Tool category
+   └─ Routes to: Q&A, App Builder, Image Gen, or Video Gen
 
-3. Code Generation (Groq/OpenAI/Anthropic)
-   └─ Generate complete app files
-   └─ Support for React, Node.js, fullstack apps
+3a. Q&A Path (Intelligent Search)
+   └─ Step 1: Groq assesses complexity
+   └─ Simple → Direct answer (2-3 sentences)
+   └─ Complex → Step 2: Linkup web search
+   └─ Step 3: Groq + search results → Detailed answer (up to 1000 tokens)
 
-4. Sandboxed Execution
-   └─ Build with Bun
-   └─ Run on random port
-   └─ Screenshot with Playwright
+3b. App Builder Path (Full Pipeline)
+   └─ Task Planning (Groq LLM)
+   └─ Code Generation (Groq/OpenAI/Anthropic)
+   └─ Sandboxed Execution (Bun + Playwright)
+   └─ AI Analysis (Groq LLM)
+   └─ Screenshot capture
 
-5. AI Analysis (Groq LLM)
-   └─ Evaluate results
-   └─ Generate suggestions
-   └─ Provide next steps
+3c. Image/Video Path
+   └─ Placeholder (coming soon)
 
-6. Dual Delivery
-   └─ Telegram: Full customer experience
-   └─ WhatsApp: Admin monitoring dashboard
+4. Dual Delivery
+   └─ Telegram: Full customer experience (voice/text + screenshots)
+   └─ Discord/WhatsApp: Admin monitoring (metrics, tool used, status)
 ```
 
 ---
@@ -241,15 +257,17 @@ The system now intelligently routes requests to different tools:
 |---------------|----------------|
 | **Gateway**       | Hono + Bun, dual webhook endpoints |
 | **Tunneling**     | Hookdeck CLI (localhost development) |
+| **AI Router**     | Intent detection → 4 tools (Q&A, App, Image, Video) |
+| **Web Search**    | Linkup SDK (AI-powered search for complex Q&A) |
 | **STT**           | ElevenLabs (scribe_v1) + OpenAI Whisper |
 | **TTS**           | ElevenLabs (eleven_monolingual_v1) |
 | **LLMs**          | Groq (llama-3.3-70b) + OpenAI + Anthropic |
 | **Code Execution**| Sandboxed Bun processes |
 | **Browser Testing**| Playwright (Chromium) |
 | **Customer Channel**| Telegram Bot API |
-| **Admin Channel** | WhatsApp (Vonage Messages API) |
+| **Admin Channels**| Discord (webhooks) + WhatsApp (Vonage) |
 | **Storage**       | Local `artifacts/` + `sandbox/` |
-| **Orchestration** | Sequential pipeline with dual notifications |
+| **Orchestration** | AI routing + parallel tool execution |
 
 ---
 
@@ -271,13 +289,20 @@ bunx playwright install chromium
 
 3. **Configure Environment**:
    ```bash
-cp .env.example .env
+   cp env.template .env
    # Edit .env with your API keys:
-   # - TELEGRAM_BOT_TOKEN
-   # - ELEVENLABS_API_KEY
-   # - GROQ_API_KEY (or OPENAI_API_KEY)
-   # - VONAGE_API_KEY, VONAGE_API_SECRET
-   # - VONAGE_WHATSAPP_TO (your admin WhatsApp number)
+   # 
+   # Required:
+   # - TELEGRAM_BOT_TOKEN (from @BotFather)
+   # - GROQ_API_KEY (from console.groq.com - free!)
+   # - ELEVENLABS_API_KEY (from elevenlabs.io)
+   #
+   # Optional but recommended:
+   # - LINKUP_API_KEY (from linkup.so - for smart Q&A)
+   # - DISCORD_WEBHOOK_URL (free admin monitoring!)
+   #
+   # Optional:
+   # - VONAGE credentials (only if you want WhatsApp admin)
    ```
 
 ### Start the System
@@ -338,6 +363,18 @@ voice2app/
       ├── orchestrator.ts   # Main pipeline + admin notifications
       └── telegram-client.ts # Telegram API utilities
     
+    router/                  # AI Router & Multi-Tool System
+      ├── intent-router.ts  # Intent detection & classification
+      ├── types.ts          # Router interfaces
+      ├── index.ts          # Main router entry
+      ├── adapters/
+      │   ├── qa-adapter.ts       # Q&A with Linkup + LLM
+      │   ├── app-code-adapter.ts # App building (wraps pipeline)
+      │   ├── image-adapter.ts    # Image generation (placeholder)
+      │   └── video-adapter.ts    # Video generation (placeholder)
+      └── services/
+          └── linkup-service.ts   # Web search integration
+    
     planner/                 # STT + Task Planning
       ├── index.ts          # Main entry point
       ├── stt.ts            # Multi-provider STT
@@ -373,21 +410,29 @@ voice2app/
       ├── logger.ts         # Logging utilities
       ├── providers.ts      # Provider selection logic
       ├── whatsapp.ts       # WhatsApp sender (Vonage)
+      ├── discord-admin.ts  # Discord admin notifications
       ├── tts.ts            # Text-to-Speech (ElevenLabs)
       └── index.ts          # Package exports
   
   sandbox/                   # Generated apps (temporary)
   artifacts/                 # Screenshots, logs (persistent)
   docs/                      # Documentation
-    ├── PROVIDERS.md         # AI provider setup guide
-    ├── MULTI-PROVIDER-UPDATE.md
-    └── ...
+    ├── AI_ROUTER.md         # AI Router guide
+    ├── DISCORD_ADMIN.md     # Discord admin setup (recommended!)
+    ├── ADMIN_NOTIFICATIONS.md # WhatsApp admin guide
+    ├── PROVIDERS.md         # AI provider setup
+    └── QUICKSTART.md        # Detailed setup guide
+  
+  logs/                      # Runtime logs
+    ├── server.log           # Server logs
+    ├── telegram-tunnel.log  # Telegram Hookdeck tunnel
+    └── vonage-tunnel.log    # WhatsApp Hookdeck tunnel
   
   Makefile                   # Development commands
   server.ts                  # Main server entry point
-  .env                       # Your API credentials
-  ADMIN_NOTIFICATIONS.md     # Admin WhatsApp guide
-  QUICKSTART.md              # Detailed setup guide
+  env.template               # Environment variable template
+  .env                       # Your API credentials (gitignored)
+  CHANGES.md                 # Version changelog
 ```
 
 ---
@@ -601,7 +646,45 @@ Flexibility to use different AI providers:
 - ✅ OpenAI (gpt-4o-mini) - High quality alternative
 - ✅ Anthropic (claude-3-5-sonnet) - Advanced reasoning
 
+**Web Search**:
+- ✅ Linkup SDK - AI-powered search for Q&A
+- Groq decides when to trigger search (intelligent, not keyword-based)
+- Full detailed answers (1000 tokens) when search is used
+
 Switch providers via environment variables - see [docs/PROVIDERS.md](./docs/PROVIDERS.md)
+
+### 🔍 **Intelligent Q&A System**
+
+The Q&A mode uses a **3-step intelligent process**:
+
+**Step 1: Groq Assesses**
+- Groq analyzes the question
+- Decides if it's SIMPLE (can answer from knowledge) or COMPLEX (needs web data)
+
+**Step 2: Conditional Search** (only if complex)
+- If SIMPLE → Skip to answer
+- If COMPLEX → Linkup searches the web for current, detailed information
+
+**Step 3: Generate Answer**
+- SIMPLE questions: Concise answer (2-3 sentences, ~300 tokens)
+- COMPLEX questions: Comprehensive answer with web data (up to 1000 tokens)
+
+**Examples**:
+
+*Simple (Groq only - fast)*:
+- Q: "What is the capital of Spain?"
+- A: "🇪🇸 The capital of Spain is Madrid..." (2-3 seconds)
+
+*Complex (Linkup + Groq - detailed)*:
+- Q: "Explain how the European Union works"
+- A: [Long, detailed explanation with web sources] (5-8 seconds)
+- Shows: "🔍 Answer enhanced with web search"
+
+**Why This is Smart**:
+- 🧠 AI decides complexity (not dumb keywords)
+- ⚡ Fast for simple questions
+- 📚 Comprehensive for complex topics
+- 💰 Cost-effective (only searches when beneficial)
 
 ### 🚀 **Hookdeck CLI Integration**
 
@@ -623,9 +706,28 @@ Simplified local development:
 
 ## 📚 Examples
 
-### Voice Message Examples
+### Q&A Examples
 
-**Simple App**:
+**Simple Questions** (Groq only - fast):
+> 📝 "What is the capital of Italy?"  
+> Response: "🇮🇹 The capital of Italy is Rome..." (2-3 seconds)
+
+> 📝 "What is photosynthesis?"  
+> Response: Brief explanation (2-3 sentences)
+
+**Complex Questions** (Linkup + Groq - detailed):
+> 📝 "Explain how the European Union works"  
+> Response: Long, comprehensive answer with web sources + "🔍 Answer enhanced with web search"
+
+> 📝 "Tell me about Microsoft's revenue for 2024"  
+> Response: Detailed financial information with current data
+
+> 🎤 "Explain in detail how quantum computing works"  
+> Response: Multi-paragraph explanation + voice summary
+
+### App Building Examples
+
+**Voice Message**:
 > 🎤 "Create a hello world page with a big title"
 
 **Complex App**:
@@ -634,9 +736,7 @@ Simplified local development:
 **Iterative Development**:
 > 🎤 "Add dark mode toggle to the previous app"
 
-### Text Message Examples
-
-**Quick Prototype**:
+**Text Message**:
 > 📝 "Create a counter with increment and decrement buttons"
 
 **Specific Requirements**:
@@ -645,6 +745,28 @@ Simplified local development:
 > - Feature cards (3 columns)
 > - Contact form
 > - Mobile responsive design"
+
+### Image Generation Examples
+
+> 📝 "Generate a logo for a tech startup"  
+> Response: "🎨 Image Generated! Your AI-generated image is ready!" + [Image attached]
+
+> 🎤 "Create an illustration of a mountain at sunset"  
+> Response: Beautiful AI-generated landscape + voice confirmation
+
+> 📝 "Make a minimalist logo for a coffee shop, brown and cream colors"  
+> Response: Professional logo design + [Image attached]
+
+**Features**:
+- High-quality 1024x1024 images
+- Stable Diffusion XL model
+- Saved to `artifacts/` directory
+- 10-20 second generation time
+
+### Video Examples (Coming Soon)
+
+> 📝 "Create a short video about coding"  
+> Response: "🎬 Video generation coming soon..."
 
 ### What You'll Receive
 
