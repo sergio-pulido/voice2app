@@ -2,7 +2,8 @@
  * Video Generation Adapter
  */
 
-import { logger } from '../../shared'
+import { logger, config } from '../../shared'
+import { translate } from '../services/lingo-service'
 import type { Adapter, AdapterInput, AdapterOutput } from '../types'
 
 export class VideoAdapter implements Adapter {
@@ -19,7 +20,7 @@ export class VideoAdapter implements Adapter {
       logger.debug(`Video prompt: "${prompt}"`)
       
       // Placeholder response
-      const response = 
+      let response = 
         `🎬 **Video Generation Request**\n\n` +
         `Prompt: "${prompt}"\n\n` +
         `This feature is coming soon! Once integrated, you'll be able to:\n` +
@@ -27,6 +28,18 @@ export class VideoAdapter implements Adapter {
         `• Create video clips and animations\n` +
         `• Get AI-powered video content\n\n` +
         `💡 For now, try asking me to build an app instead!`
+      
+      // Post-processing: Translate back to original language if needed
+      const targetLang = input.detectedLang || 'en'
+      if (config.lingoApiKey && targetLang !== 'en' && response.trim().length > 0) {
+        logger.info(`🌐 Translating video response back to ${targetLang}...`)
+        try {
+          response = await translate(response, targetLang, { style: config.lingoStyle })
+          logger.success(`✅ Video response translated to ${targetLang}`)
+        } catch (error) {
+          logger.warn('Video response translation failed, keeping English:', error)
+        }
+      }
       
       const processingTime = Date.now() - startTime
       

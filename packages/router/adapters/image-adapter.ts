@@ -4,6 +4,7 @@
 
 import { logger, config } from '../../shared'
 import { generateImageWithRetry } from '../services/huggingface-service'
+import { translate } from '../services/lingo-service'
 import type { Adapter, AdapterInput, AdapterOutput } from '../types'
 
 export class ImageAdapter implements Adapter {
@@ -45,10 +46,22 @@ export class ImageAdapter implements Adapter {
       const processingTime = Date.now() - startTime
       
       // Build response message
-      const response = 
+      let response = 
         `**Done!**\n\n` +
         `Prompt: "${prompt}"\n\n` +
         `Generated with: Stable Diffusion XL • ${(processingTime / 1000).toFixed(1)}s`
+      
+      // Post-processing: Translate back to original language if needed
+      const targetLang = input.detectedLang || 'en'
+      if (config.lingoApiKey && targetLang !== 'en' && response.trim().length > 0) {
+        logger.info(`🌐 Translating image response back to ${targetLang}...`)
+        try {
+          response = await translate(response, targetLang, { style: config.lingoStyle })
+          logger.success(`✅ Image response translated to ${targetLang}`)
+        } catch (error) {
+          logger.warn('Image response translation failed, keeping English:', error)
+        }
+      }
       
       return {
         summaryText: response,

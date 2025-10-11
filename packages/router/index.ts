@@ -2,13 +2,15 @@
  * Router package: Intent detection and request routing
  */
 
-import { logger } from '../shared'
+import { logger, config } from '../shared'
 import { detectIntent, getCategoryName, getCategoryEmoji, type IntentCategory } from './intent-router'
-import { qaAdapter, appCodeAdapter, imageAdapter, videoAdapter } from './adapters'
+import { qaAdapter, appCodeAdapter, imageAdapter, videoAdapter, translateAdapter } from './adapters'
 import type { AdapterInput, AdapterOutput } from './types'
 
 // Import STT functionality
 import { transcribeAudio } from '../planner'
+// Import Lingo translation
+import { normalizeInput } from './services/lingo-service'
 
 /**
  * Main routing function
@@ -38,11 +40,27 @@ export async function routeRequest(input: AdapterInput): Promise<AdapterOutput> 
     textToProcess = String(textToProcess)
   }
   
-  // Detect intent
+  // Step: Language detection and normalization (if Lingo is configured)
+  let detectedLang = 'en'
+  let normalizedText = textToProcess
+  
+  if (config.lingoApiKey && textToProcess.trim().length > 0) {
+    logger.info('🌍 Detecting language and normalizing input...')
+    try {
+      const lingoResult = await normalizeInput(textToProcess)
+      detectedLang = lingoResult.detectedLang
+      normalizedText = lingoResult.translatedText
+      logger.success(`🌍 Language: ${detectedLang} → Normalized: "${normalizedText}"`)
+    } catch (error) {
+      logger.warn('Language normalization failed, using original text:', error)
+    }
+  }
+  
+  // Detect intent using normalized text
   const intent = await detectIntent({
-    text: textToProcess,
+    text: normalizedText,
     userId: input.userId,
-    lang: 'auto'
+    lang: detectedLang
   })
   
   const categoryName = getCategoryName(intent.category)
@@ -53,11 +71,13 @@ export async function routeRequest(input: AdapterInput): Promise<AdapterOutput> 
   // Route to appropriate adapter
   let result: AdapterOutput
   
-  // Update input with transcription for adapters
+  // Update input with transcription and language info for adapters
   const adapterInput = {
     ...input,
-    text: textToProcess,
-    transcription
+    text: normalizedText, // Use normalized text for processing
+    transcription,
+    originalText: textToProcess, // Keep original for reference
+    detectedLang
   }
   
   switch (intent.category) {
@@ -77,6 +97,10 @@ export async function routeRequest(input: AdapterInput): Promise<AdapterOutput> 
       result = await videoAdapter.run(adapterInput)
       break
       
+    case 'translate':
+      result = await translateAdapter.run(adapterInput)
+      break
+      
     default:
       // Fallback to app code
       logger.warn(`Unknown category: ${intent.category}, falling back to app_code`)
@@ -89,6 +113,9 @@ export async function routeRequest(input: AdapterInput): Promise<AdapterOutput> 
     routedTo: intent.category,
     routingConfidence: intent.confidence,
     transcription,
+    detectedLang,
+    originalText: textToProcess,
+    normalizedText,
     totalTime: Date.now() - startTime
   }
   

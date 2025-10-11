@@ -11,6 +11,8 @@ export interface AdapterInput {
   username?: string
   transcription?: string  // Transcribed text from voiceBuffer (STTResult.text)
   voiceBuffer?: Buffer
+  originalText?: string   // Original text before normalization
+  detectedLang?: string   // Detected language from Lingo
 }
 
 export interface AdapterOutput {
@@ -23,6 +25,9 @@ export interface AdapterOutput {
     filesGenerated?: number
     status?: 'success' | 'partial' | 'error'
     transcription?: string  // Original voice transcription
+    detectedLang?: string   // Detected language
+    originalText?: string   // Original text before normalization
+    normalizedText?: string // Normalized text used for processing
     [key: string]: any
   }
 }

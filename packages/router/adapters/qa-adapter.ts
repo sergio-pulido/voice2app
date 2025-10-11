@@ -4,6 +4,7 @@
 
 import { logger, config } from '../../shared'
 import { searchWeb, shouldUseWebSearch } from '../services/linkup-service'
+import { translate } from '../services/lingo-service'
 import type { Adapter, AdapterInput, AdapterOutput } from '../types'
 
 export class QAAdapter implements Adapter {
@@ -77,13 +78,25 @@ export class QAAdapter implements Adapter {
       const processingTime = Date.now() - startTime
       
       // Add indicator if web search was used
-      const responseText = usedWebSearch 
+      let responseText = usedWebSearch 
         ? `${finalAnswer}\n\n_🔍 Answer enhanced with web search_`
         : finalAnswer
       
+      // Post-processing: Translate back to original language if needed
+      const targetLang = input.detectedLang || 'en'
+      if (config.lingoApiKey && targetLang !== 'en' && responseText.trim().length > 0) {
+        logger.info(`🌐 Translating response back to ${targetLang}...`)
+        try {
+          responseText = await translate(responseText, targetLang, { style: config.lingoStyle })
+          logger.success(`✅ Response translated to ${targetLang}`)
+        } catch (error) {
+          logger.warn('Response translation failed, keeping English:', error)
+        }
+      }
+      
       return {
         summaryText: responseText,
-        ttsText: finalAnswer.substring(0, 400), // Shorter for voice
+        ttsText: responseText.substring(0, 400), // Shorter for voice
         metadata: {
           category: 'qa',
           processingTime,

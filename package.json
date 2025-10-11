@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "module": "server.ts",
   "type": "module",
+  "author": "Sergio Pulido",
   "scripts": {
     "dev": "bun run --watch server.ts",
     "start": "bun run server.ts",

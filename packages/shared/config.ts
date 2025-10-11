@@ -12,6 +12,7 @@ export const config = {
   elevenlabsApiKey: process.env.ELEVENLABS_API_KEY || '',
   linkupApiKey: process.env.LINKUP_API_KEY || '',
   huggingfaceApiKey: process.env.HUGGINGFACE_API_KEY || '',
+  lingoApiKey: process.env.LINGODEV_API_KEY || '',
   
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',
   telegramAdminChatId: process.env.TELEGRAM_ADMIN_CHAT_ID || '',
@@ -52,6 +53,10 @@ export const config = {
   // Runner Settings
   runnerTimeout: parseInt(process.env.RUNNER_TIMEOUT || '30000'), // 30s
   screenshotDelay: parseInt(process.env.SCREENSHOT_DELAY || '2000'), // 2s
+  
+  // Lingo Translation Settings
+  lingoDefaultTarget: process.env.LINGO_DEFAULT_TARGET || 'en',
+  lingoStyle: process.env.LINGO_STYLE || 'friendly',
 } as const
 
 export function validateConfig(): boolean {

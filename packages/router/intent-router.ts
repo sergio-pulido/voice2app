@@ -4,7 +4,7 @@
 
 import { logger } from '../shared'
 
-export type IntentCategory = 'qa' | 'app_code' | 'image_gen' | 'video_gen'
+export type IntentCategory = 'qa' | 'app_code' | 'image_gen' | 'video_gen' | 'translate'
 
 export interface IntentResult {
   category: IntentCategory
@@ -64,11 +64,30 @@ function fastClassify(text: string): IntentResult | null {
     'vídeo corto', 'short video', 'clip'
   ]
   
+  // Translation keywords
+  const translateKeywords = [
+    'translate', 'traduce', 'tradueix', 'traduir',
+    'how do you say', 'cómo se dice', 'com es diu',
+    'what is', 'qué es', 'què és',
+    'in spanish', 'en español', 'en castellano',
+    'in french', 'en français', 'en francés',
+    'in english', 'en inglés', 'en anglès',
+    'in italian', 'en italiano',
+    'in german', 'en alemán', 'en alemany'
+  ]
+  
   // Additional Q&A keywords (for broader matching)
   const qaGeneralKeywords = [
     'how to', 'cómo', 'why', 'por qué',
     'capital', 'definition'
   ]
+  
+  // Check for translation (high priority)
+  for (const keyword of translateKeywords) {
+    if (lowerText.includes(keyword)) {
+      return { category: 'translate', confidence: 0.9 }
+    }
+  }
   
   // Check for app/code generation (highest priority for this system)
   for (const keyword of appKeywords) {
@@ -234,7 +253,10 @@ async function groqClassify(text: string): Promise<IntentResult> {
 4. "video_gen" - Generating videos, clips, animations
    Examples: "Create a video", "Make a clip", "Generate video about X"
 
-Respond with ONLY ONE WORD: qa, app_code, image_gen, or video_gen
+5. "translate" - Translation requests
+   Examples: "Translate 'Hello' to Spanish", "How do you say 'Good morning' in French?", "What is 'cat' in German?"
+
+Respond with ONLY ONE WORD: qa, app_code, image_gen, video_gen, or translate
 
 Default to "qa" if uncertain.`
             },
@@ -263,7 +285,7 @@ Default to "qa" if uncertain.`
       const result = data.choices[0]?.message?.content?.trim().toLowerCase() || 'qa'
       
       // Validate the response
-      const validCategories: IntentCategory[] = ['qa', 'app_code', 'image_gen', 'video_gen']
+      const validCategories: IntentCategory[] = ['qa', 'app_code', 'image_gen', 'video_gen', 'translate']
       const category = validCategories.includes(result as IntentCategory) 
         ? result as IntentCategory 
         : 'qa'
@@ -331,7 +353,8 @@ export function getCategoryName(category: IntentCategory): string {
     'qa': '💬 Q&A',
     'app_code': '💻 App Builder',
     'image_gen': '🎨 Image Generator',
-    'video_gen': '🎬 Video Generator'
+    'video_gen': '🎬 Video Generator',
+    'translate': '🌐 Translator'
   }
   return names[category]
 }
@@ -344,7 +367,8 @@ export function getCategoryEmoji(category: IntentCategory): string {
     'qa': '💬',
     'app_code': '💻',
     'image_gen': '🎨',
-    'video_gen': '🎬'
+    'video_gen': '🎬',
+    'translate': '🌐'
   }
   return emojis[category]
 }
