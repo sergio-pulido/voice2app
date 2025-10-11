@@ -36,7 +36,7 @@ export class QAAdapter implements Adapter {
     const startTime = Date.now()
     
     try {
-      const question = input.transcription || input.text
+      const question = String(input.transcription || input.text || '')
       
       // Check if it's a super simple question (one or two words)
       const wordCount = question.trim().split(/\s+/).length

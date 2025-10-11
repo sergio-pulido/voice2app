@@ -55,7 +55,7 @@ export async function orchestrate(options: OrchestrateOptions): Promise<void> {
     
     // Prepare input for router
     const messageType = voiceBuffer ? 'voice' : 'text'
-    const inputText = textMessage || '[Voice message - will be transcribed]'
+    const inputText = textMessage || (voiceBuffer ? 'Voice message' : 'No input')
     const inputPreview = textMessage || (voiceBuffer ? `[Voice: ${Math.round(voiceBuffer.length / 1024)}KB]` : '[No input]')
     
     // Send initial admin notification
@@ -74,7 +74,7 @@ export async function orchestrate(options: OrchestrateOptions): Promise<void> {
       text: inputText,
       userId: chatId,
       username,
-      transcription: undefined, // Will be set by adapter if needed
+      transcription: undefined, // Will be set by router if voice message
       voiceBuffer
     })
     

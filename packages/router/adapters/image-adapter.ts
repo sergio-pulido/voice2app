@@ -11,7 +11,7 @@ export class ImageAdapter implements Adapter {
     logger.info('🎨 Running Image Generation adapter...')
     
     const startTime = Date.now()
-    const prompt = input.transcription || input.text
+    const prompt = String(input.transcription || input.text || '')
     
     try {
       // Check if HuggingFace is configured
@@ -46,7 +46,7 @@ export class ImageAdapter implements Adapter {
       
       // Build response message
       const response = 
-        `🎨 **Image Generated!**\n\n` +
+        `**Done!**\n\n` +
         `Prompt: "${prompt}"\n\n` +
         `Generated with: Stable Diffusion XL • ${(processingTime / 1000).toFixed(1)}s`
       

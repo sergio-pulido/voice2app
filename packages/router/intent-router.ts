@@ -295,10 +295,12 @@ Default to "qa" if uncertain.`
  * Main intent detection function
  */
 export async function detectIntent(input: RouterInput): Promise<IntentResult> {
-  logger.debug(`🧠 Detecting intent for: "${input.text.substring(0, 50)}..."`)
+  const textToLog = typeof input.text === 'string' ? input.text.substring(0, 50) : String(input.text).substring(0, 50)
+  logger.debug(`🧠 Detecting intent for: "${textToLog}..."`)
   
   // Step 1: Validate and sanitize input
-  const validation = validateInput(input.text)
+  const textToValidate = typeof input.text === 'string' ? input.text : String(input.text)
+  const validation = validateInput(textToValidate)
   
   if (!validation.valid) {
     logger.warn(`⚠️  Invalid input: ${validation.reason}`)

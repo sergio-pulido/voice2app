@@ -7,15 +7,40 @@ import { detectIntent, getCategoryName, getCategoryEmoji, type IntentCategory } 
 import { qaAdapter, appCodeAdapter, imageAdapter, videoAdapter } from './adapters'
 import type { AdapterInput, AdapterOutput } from './types'
 
+// Import STT functionality
+import { transcribeAudio } from '../planner'
+
 /**
  * Main routing function
  */
 export async function routeRequest(input: AdapterInput): Promise<AdapterOutput> {
   const startTime = Date.now()
   
+  // Handle voice transcription if needed
+  let textToProcess: string = input.text || ''
+  let transcription = input.transcription
+  
+  if (input.voiceBuffer && !input.transcription) {
+    logger.info('🎤 Transcribing voice message...')
+    try {
+      const sttResult = await transcribeAudio(input.voiceBuffer)
+      transcription = sttResult.text
+      textToProcess = transcription || ''
+      logger.success(`✅ Transcription: "${transcription}"`)
+    } catch (error) {
+      logger.error('❌ Voice transcription failed:', error)
+      textToProcess = input.text || 'Voice message transcription failed'
+    }
+  }
+  
+  // Ensure textToProcess is always a string
+  if (typeof textToProcess !== 'string') {
+    textToProcess = String(textToProcess)
+  }
+  
   // Detect intent
   const intent = await detectIntent({
-    text: input.text,
+    text: textToProcess,
     userId: input.userId,
     lang: 'auto'
   })
@@ -28,27 +53,34 @@ export async function routeRequest(input: AdapterInput): Promise<AdapterOutput> 
   // Route to appropriate adapter
   let result: AdapterOutput
   
+  // Update input with transcription for adapters
+  const adapterInput = {
+    ...input,
+    text: textToProcess,
+    transcription
+  }
+  
   switch (intent.category) {
     case 'qa':
-      result = await qaAdapter.run(input)
+      result = await qaAdapter.run(adapterInput)
       break
       
     case 'app_code':
-      result = await appCodeAdapter.run(input)
+      result = await appCodeAdapter.run(adapterInput)
       break
       
     case 'image_gen':
-      result = await imageAdapter.run(input)
+      result = await imageAdapter.run(adapterInput)
       break
       
     case 'video_gen':
-      result = await videoAdapter.run(input)
+      result = await videoAdapter.run(adapterInput)
       break
       
     default:
       // Fallback to app code
       logger.warn(`Unknown category: ${intent.category}, falling back to app_code`)
-      result = await appCodeAdapter.run(input)
+      result = await appCodeAdapter.run(adapterInput)
   }
   
   // Add routing metadata
@@ -56,6 +88,7 @@ export async function routeRequest(input: AdapterInput): Promise<AdapterOutput> 
     ...result.metadata,
     routedTo: intent.category,
     routingConfidence: intent.confidence,
+    transcription,
     totalTime: Date.now() - startTime
   }
   

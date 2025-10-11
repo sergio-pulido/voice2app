@@ -49,9 +49,10 @@ export async function generateImage(prompt: string): Promise<string> {
       }
     })
     
-    // Convert blob to buffer
-    const arrayBuffer = await response.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
+    // Convert response to buffer
+    const buffer = typeof response === 'string' 
+      ? Buffer.from(response, 'base64')
+      : Buffer.from(await (response as Blob).arrayBuffer())
     
     // Save to artifacts directory
     const timestamp = Date.now()

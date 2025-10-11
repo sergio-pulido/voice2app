@@ -10,7 +10,7 @@ export class VideoAdapter implements Adapter {
     logger.info('🎬 Running Video Generation adapter...')
     
     const startTime = Date.now()
-    const prompt = input.transcription || input.text
+    const prompt = String(input.transcription || input.text || '')
     
     try {
       // TODO: Integrate with Veed.io or other video generation API
