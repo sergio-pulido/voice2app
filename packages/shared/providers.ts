@@ -2,15 +2,11 @@
  * Provider interfaces and types
  */
 
+import type { STTResult } from './types'
+
 export type STTProvider = 'openai' | 'elevenlabs'
 export type LLMProvider = 'openai' | 'anthropic' | 'groq'
 export type TTSProvider = 'openai' | 'elevenlabs'
-
-export interface STTResult {
-  text: string
-  duration: number
-  language?: string
-}
 
 export interface LLMMessage {
   role: 'system' | 'user' | 'assistant'

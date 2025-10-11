@@ -36,22 +36,22 @@ export async function sendWhatsAppMessage(message: WhatsAppMessage): Promise<Von
     }
 
     logger.info(`📱 Sending WhatsApp message to ${message.to}`)
-    logger.debug('WhatsApp payload:', JSON.stringify(payload, null, 2))
 
+    const auth = btoa(`${config.vonageApiKey}:${config.vonageApiSecret}`)
+    
     const response = await fetch(url, {
       method: 'POST',
       headers: {
+        'Authorization': `Basic ${auth}`,
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': `Basic ${Buffer.from(`${config.vonageApiKey}:${config.vonageApiSecret}`).toString('base64')}`
+        'Accept': 'application/json'
       },
       body: JSON.stringify(payload)
     })
 
     if (!response.ok) {
       const errorText = await response.text()
-      logger.error(`WhatsApp API error: ${response.status} ${response.statusText}`)
-      logger.error('Error response:', errorText)
+      logger.error(`Vonage API error: ${response.status} - ${errorText}`)
       return null
     }
 
@@ -59,8 +59,9 @@ export async function sendWhatsAppMessage(message: WhatsAppMessage): Promise<Von
     logger.success(`📱 WhatsApp message sent successfully: ${result.message_uuid}`)
     
     return result
+    
   } catch (error) {
-    logger.error('Error sending WhatsApp message:', error)
+    logger.error('Failed to send WhatsApp message:', error)
     return null
   }
 }
@@ -69,7 +70,7 @@ export async function sendWhatsAppMessage(message: WhatsAppMessage): Promise<Von
  * Send WhatsApp message with retry logic
  */
 export async function sendWhatsAppWithRetry(
-  message: WhatsAppMessage, 
+  message: WhatsAppMessage,
   maxRetries: number = 3
 ): Promise<VonageResponse | null> {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -80,12 +81,12 @@ export async function sendWhatsAppWithRetry(
     }
     
     if (attempt < maxRetries) {
-      const delay = Math.pow(2, attempt) * 1000 // Exponential backoff
-      logger.warn(`WhatsApp send failed, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`)
-      await new Promise(resolve => setTimeout(resolve, delay))
+      logger.warn(`📱 WhatsApp send failed, retrying (${attempt}/${maxRetries})...`)
+      await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
     }
   }
   
-  logger.error(`Failed to send WhatsApp message after ${maxRetries} attempts`)
+  logger.error(`📱 Failed to send WhatsApp message after ${maxRetries} attempts`)
   return null
 }
+

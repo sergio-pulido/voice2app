@@ -3,7 +3,7 @@
  */
 
 import { logger, config } from '../shared'
-// import { sendWhatsAppMessage } from '../shared/whatsapp'
+import { sendWhatsAppMessage } from '../shared/whatsapp'
 import { processInput } from '../planner'
 import { generateApp } from '../codegen'
 import { runApp } from '../runner'
@@ -23,12 +23,21 @@ export async function orchestrate(options: OrchestrateOptions): Promise<void> {
   logger.info('🚀 Starting orchestration...')
   
   try {
-    // Send acknowledgment
+    // Send acknowledgment to Telegram
     await sendAcknowledgment(chatId, voiceBuffer ? 'voice' : 'text')
     
     // Send WhatsApp acknowledgment if configured
-    // TODO: Re-enable after fixing circular dependency
-    // if (config.vonageWhatsAppTo) { ... }
+    if (config.vonageWhatsAppTo) {
+      const messageType = voiceBuffer ? 'voice' : 'text'
+      const whatsappAck = messageType === 'voice'
+        ? '🎤 Got your voice message! Processing...'
+        : '📝 Got your message! Processing...'
+      
+      await sendWhatsAppMessage({
+        to: config.vonageWhatsAppTo,
+        text: whatsappAck
+      })
+    }
     
     // Step 1: Planner (STT + Task Planning)
     logger.info('📋 Step 1: Planning...')
@@ -85,8 +94,20 @@ export async function orchestrate(options: OrchestrateOptions): Promise<void> {
     })
     
     // Send WhatsApp notification if configured
-    // TODO: Re-enable after fixing circular dependency
-    // if (config.vonageWhatsAppTo) { ... }
+    if (config.vonageWhatsAppTo) {
+      logger.info('📱 Sending WhatsApp notification...')
+      
+      // Create a cleaner WhatsApp message (no markdown)
+      const whatsappMessage = message
+        .replace(/\*/g, '') // Remove markdown bold
+        .replace(/_/g, '') // Remove markdown italic
+        .replace(/`/g, '') // Remove code blocks
+      
+      await sendWhatsAppMessage({
+        to: config.vonageWhatsAppTo,
+        text: whatsappMessage
+      })
+    }
     
     logger.success('🎉 Orchestration complete!')
   } catch (error) {
@@ -97,8 +118,16 @@ export async function orchestrate(options: OrchestrateOptions): Promise<void> {
     await sendError(chatId, errorMessage)
     
     // Send error to WhatsApp if configured
-    // TODO: Re-enable after fixing circular dependency
-    // if (config.vonageWhatsAppTo) { ... }
+    if (config.vonageWhatsAppTo) {
+      logger.info('📱 Sending WhatsApp error notification...')
+      
+      const whatsappError = `❌ Sorry, something went wrong:\n\n${errorMessage}\n\nPlease try again!`
+      
+      await sendWhatsAppMessage({
+        to: config.vonageWhatsAppTo,
+        text: whatsappError
+      })
+    }
   }
 }
 

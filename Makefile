@@ -61,8 +61,7 @@ tunnels:
 	@echo "   ✅ Vonage tunnel started"
 	@echo ""
 	@echo "📡 Hookdeck URLs:"
-	@echo "   • Telegram: Check telegram-tunnel.log"
-	@echo "   • Vonage: Check vonage-tunnel.log"
+	@grep -h "URL:" telegram-tunnel.log vonage-tunnel.log 2>/dev/null || echo "   ⚠️  URLs not yet available, check log files"
 	@echo "   • Dashboard: https://dashboard.hookdeck.com/"
 	@echo ""
 
