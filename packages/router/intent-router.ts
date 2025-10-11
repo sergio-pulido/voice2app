@@ -63,16 +63,11 @@ function fastClassify(text: string): IntentResult | null {
     'vídeo corto', 'short video', 'clip'
   ]
   
-  // Question/Q&A keywords (check these LAST to avoid false positives)
-  const qaKeywords = [
-    'what is', 'qué es', 'cual es', 'which is',
+  // Additional Q&A keywords (for broader matching)
+  const qaGeneralKeywords = [
     'how to', 'cómo', 'why', 'por qué',
-    'tell me', 'dime',
     'capital', 'definition'
   ]
-  
-  // Words that indicate explanation/Q&A specifically (not code)
-  const qaSpecificWords = ['explain', 'explica', 'what does', 'qué significa']
   
   // Check for app/code generation (highest priority for this system)
   for (const keyword of appKeywords) {
@@ -95,22 +90,8 @@ function fastClassify(text: string): IntentResult | null {
     }
   }
   
-  // Check for Q&A specific (high confidence for "explain")
-  for (const keyword of qaSpecificWords) {
-    if (lowerText.includes(keyword)) {
-      // But check if it's about explaining code/programming
-      if (lowerText.includes('react') || lowerText.includes('component') || 
-          lowerText.includes('typescript') || lowerText.includes('code')) {
-        // Could be either Q&A or wanting to build something
-        // Return lower confidence to trigger LLM classification
-        return null
-      }
-      return { category: 'qa', confidence: 0.85 }
-    }
-  }
-  
-  // Check for general Q&A
-  for (const keyword of qaKeywords) {
+  // Check for general Q&A keywords
+  for (const keyword of qaGeneralKeywords) {
     if (lowerText.includes(keyword)) {
       return { category: 'qa', confidence: 0.8 }
     }
