@@ -9,11 +9,24 @@ export class ElevenLabsSTTProvider implements ISTTProvider {
     try {
       logger.debug('Using ElevenLabs STT')
       
-      // Create form data
+      if (!audioBuffer || audioBuffer.length === 0) {
+        throw new Error('Empty audio buffer provided')
+      }
+      
+      logger.debug(`Audio buffer size: ${audioBuffer.length} bytes`)
+      
+      // Create form data - use Bun.file() or File constructor properly
       const formData = new FormData()
-      const audioBlob = new Blob([audioBuffer], { type: 'audio/ogg' })
-      formData.append('audio', audioBlob, 'audio.ogg')
-      formData.append('model_id', 'eleven_multilingual_v2')
+      
+      // Create a proper File object with the audio buffer
+      const audioFile = new File(
+        [new Uint8Array(audioBuffer)], 
+        'audio.oga', 
+        { type: 'audio/ogg' }
+      )
+      
+      formData.append('file', audioFile)  // ElevenLabs uses 'file' not 'audio'
+      formData.append('model_id', 'scribe_v1')  // Use the correct ElevenLabs STT model
       
       // Call ElevenLabs Speech-to-Text API
       const response = await fetch('https://api.elevenlabs.io/v1/speech-to-text', {

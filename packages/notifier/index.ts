@@ -49,6 +49,32 @@ async function sendMessage(chatId: number, text: string): Promise<void> {
   
   if (!response.ok) {
     const errorText = await response.text()
+    
+    // If markdown parsing failed, try sending without markdown
+    if (errorText.includes("can't parse entities")) {
+      logger.warn('Markdown parsing failed, retrying without markdown...')
+      
+      const retryResponse = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text,
+          // No parse_mode - send as plain text
+        }),
+      })
+      
+      if (!retryResponse.ok) {
+        const retryError = await retryResponse.text()
+        throw new Error(`Telegram API error (${retryResponse.status}): ${retryError}`)
+      }
+      
+      logger.debug('Message sent (plain text)')
+      return
+    }
+    
     throw new Error(`Telegram API error (${response.status}): ${errorText}`)
   }
   
