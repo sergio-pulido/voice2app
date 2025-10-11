@@ -8,38 +8,55 @@ You can build while walking, running, or hiking — completely hands-free.
 
 ## ✨ What's New
 
-### Latest Updates (v2.1)
+### Latest Updates (v2.3 - October 2025)
 
-- 🧠 **AI Router**: Groq-powered intent detection routes requests to the right tool (Q&A, App Builder, Image Gen, Video Gen) - no keyword matching!
-- 🔍 **Linkup Integration**: AI-powered web search for complex Q&A - Groq decides when to search
-- 📢 **Discord Admin**: Free, unlimited admin notifications with rich embeds (recommended over WhatsApp)
-- ⚙️ **Configurable Notifications**: Enable/disable WhatsApp and Discord independently
-- 🎤 **Voice-to-Voice Responses**: Send voice, get voice back! Full TTS integration with ElevenLabs
-- 📱 **Dual Admin Channels**: WhatsApp (mobile) and/or Discord (team) - your choice
-- 🔄 **Smart Response Matching**: Automatic voice/text detection with appropriate response format
-- 🎯 **Multi-Provider AI**: Support for ElevenLabs/OpenAI (STT/TTS) and Groq/OpenAI/Anthropic (LLMs)
+**🚀 Major Improvements:**
+
+- 🧠 **Intelligent AI Router**: Groq LLM-powered intent classification with input validation - no keyword matching, always routes correctly!
+- 🎨 **Image Generation**: HuggingFace Stable Diffusion XL integration for creating logos, illustrations, and images
+- 🔍 **Smart Q&A System**: Groq automatically assesses complexity - simple questions get instant answers, complex ones use Linkup web search
+- 📢 **Discord Admin Notifications**: Free, unlimited admin alerts with rich embeds (recommended over WhatsApp)
+- 🎤 **Voice-to-Voice**: Send voice, get voice back! Full TTS/STT integration with ElevenLabs/OpenAI
+- 🛡️ **Input Validation**: Safeguards check length, content quality before processing
+- ⚙️ **Configurable Channels**: Enable/disable WhatsApp and Discord admin notifications independently
+- 🎯 **Multi-Provider AI**: Support for Groq/OpenAI/Anthropic (LLMs), ElevenLabs/OpenAI (STT/TTS), HuggingFace (Image Gen)
 - 🚀 **Makefile + Hookdeck CLI**: One command (`make dev`) to start server + dual tunnels
-- 🛠️ **Enhanced Error Handling**: Detailed admin notifications with stack traces
-- ⚡ **Performance Tracking**: Processing time metrics in every admin notification
+- 🛠️ **Enhanced Error Handling**: Detailed admin notifications with stack traces and performance metrics
 
 ### Why These Features Matter
 
 **For Developers**:
-- Build apps completely hands-free while hiking/running
-- Get instant voice feedback without looking at your phone
-- Monitor system health via WhatsApp
+- 🏃 Build apps completely hands-free while hiking/running
+- 🎤 Get instant voice feedback without looking at your phone
+- 📊 Monitor system health via Discord or WhatsApp
+- 🎨 Generate images and logos on the fly
+- 📁 Organized project structure (logs/, tests/, sandbox/, artifacts/)
 
 **For Admins**:
-- Track all customer activity in real-time
-- Get immediate error alerts
-- Understand usage patterns and performance metrics
+- 📊 Track all customer activity in real-time with rich Discord embeds
+- ⚠️ Get immediate error alerts with stack traces
+- 📈 Understand usage patterns and performance metrics
+- 💰 Free unlimited notifications with Discord (vs WhatsApp paid tiers)
+- 🎯 See which AI tool was used for each request
 
 **For Customers**:
-- Natural voice interaction
-- Fast, intelligent responses
-- Professional experience via Telegram
+- 💬 Natural voice interaction with voice responses
+- ⚡ Fast, intelligent responses - simple Q&A in 2-3 seconds
+- 🔍 Complex questions get comprehensive web-searched answers
+- 🎨 Generate images with natural language prompts
+- 💻 Build complete apps from voice descriptions
+- 🤖 Smart AI router always picks the right tool
 
 ## 🚀 Quick Start
+
+### First Time Setup (5 minutes)
+
+1. **Prerequisites**: Hookdeck CLI, Bun, Playwright
+2. **Configure**: Copy `env.template` to `.env` and add your keys
+3. **Start**: Run `make dev`
+4. **Test**: Send a message to your Telegram bot
+
+### Daily Development
 
 ```bash
 # Start everything (server + Hookdeck tunnels)
@@ -50,6 +67,12 @@ make logs
 
 # Stop everything
 make clean
+```
+
+**Quick Configuration Check**:
+```bash
+# Verify your environment
+bun run scripts/test-setup.ts
 ```
 
 ---
@@ -146,11 +169,12 @@ The system uses **Groq LLM** to intelligently classify and route requests with h
 - "Generate an explainer video"
 
 **How It Works**:
-- 🚀 **Fast keyword detection** (93% accuracy, <1ms) - Routes to tool category
-- 🧠 **Groq assesses complexity** - Decides simple vs complex for Q&A
-- 🔍 **Linkup web search** - Triggered by Groq when needed (not keywords!)
-- 📝 **Adaptive answers** - Short for simple, detailed for complex
-- 🎯 **Tool shown in responses** - Customer and admin see which tool was used
+1. 🛡️ **Input Validation** - Safeguards check minimum length, content quality, word count
+2. 🧠 **Groq LLM Classification** (~500ms) - Intelligently determines intent (qa/app_code/image_gen/video_gen)
+3. 🎯 **Smart Routing** - Always routes to the correct tool (95%+ accuracy)
+4. 🔍 **Complexity Assessment** (Q&A only) - Groq decides if web search is needed
+5. 📝 **Adaptive Responses** - Simple answers in 2-3s, complex answers with web search in 5-8s
+6. 🎨 **Tool Indicators** - Responses show which tool was used (**💬 Q&A**, **💻 App Builder**, etc.)
 
 ### 🎤 Voice-to-Voice Communication
 - **Intelligent Response Matching**: 
@@ -212,9 +236,15 @@ The system uses **Groq LLM** to intelligently classify and route requests with h
 - ElevenLabs (eleven_monolingual_v1)
 
 **Language Models**:
-- Groq (llama-3.3-70b-versatile) - Default, fast
+- Groq (llama-3.3-70b-versatile) - Default, fast, used for routing & Q&A
 - OpenAI (gpt-4o-mini) - Alternative
 - Anthropic (claude-3-5-sonnet) - Alternative
+
+**Image Generation**:
+- HuggingFace (stabilityai/stable-diffusion-xl-base-1.0) - 1024x1024 images
+
+**Web Search**:
+- Linkup SDK - AI-powered search for complex Q&A
 
 ### 📊 Complete Pipeline
 
@@ -241,8 +271,14 @@ The system uses **Groq LLM** to intelligently classify and route requests with h
    └─ AI Analysis (Groq LLM)
    └─ Screenshot capture
 
-3c. Image/Video Path
-   └─ Placeholder (coming soon)
+3c. Image Generation Path
+   └─ HuggingFace Stable Diffusion XL
+   └─ Generate 1024x1024 images
+   └─ Save to artifacts/ directory
+   └─ Return image with metadata
+
+3d. Video Generation Path
+   └─ Coming soon
 
 4. Dual Delivery
    └─ Telegram: Full customer experience (voice/text + screenshots)
@@ -257,11 +293,12 @@ The system uses **Groq LLM** to intelligently classify and route requests with h
 |---------------|----------------|
 | **Gateway**       | Hono + Bun, dual webhook endpoints |
 | **Tunneling**     | Hookdeck CLI (localhost development) |
-| **AI Router**     | Intent detection → 4 tools (Q&A, App, Image, Video) |
-| **Web Search**    | Linkup SDK (AI-powered search for complex Q&A) |
+| **AI Router**     | Groq LLM classification with input validation → 4 tools |
+| **Web Search**    | Linkup SDK (AI-powered search triggered by Groq) |
+| **Image Gen**     | HuggingFace Stable Diffusion XL (1024x1024 PNG) |
 | **STT**           | ElevenLabs (scribe_v1) + OpenAI Whisper |
 | **TTS**           | ElevenLabs (eleven_monolingual_v1) |
-| **LLMs**          | Groq (llama-3.3-70b) + OpenAI + Anthropic |
+| **LLMs**          | Groq (llama-3.3-70b) for routing & Q&A + OpenAI + Anthropic |
 | **Code Execution**| Sandboxed Bun processes |
 | **Browser Testing**| Playwright (Chromium) |
 | **Customer Channel**| Telegram Bot API |
@@ -297,9 +334,9 @@ bunx playwright install chromium
    # - GROQ_API_KEY (from console.groq.com - free!)
    # - ELEVENLABS_API_KEY (from elevenlabs.io)
    #
-   # Optional but recommended:
-   # - LINKUP_API_KEY (from linkup.so - for smart Q&A)
-   # - DISCORD_WEBHOOK_URL (free admin monitoring!)
+   # Recommended:
+   # - DISCORD_WEBHOOK_URL (free, unlimited admin notifications!)
+   # - LINKUP_API_KEY (from linkup.so - for smart Q&A with web search)
    #
    # Optional:
    # - VONAGE credentials (only if you want WhatsApp admin)
@@ -457,7 +494,10 @@ ELEVENLABS_API_KEY=your_elevenlabs_api_key  # Recommended (scribe_v1)
 # OR use OPENAI_API_KEY for Whisper
 
 # Q&A Enhancement (optional but recommended)
-LINKUP_API_KEY=your_linkup_api_key  # For web search - get from linkup.so
+LINKUP_API_KEY=your_linkup_api_key          # For web search - get from linkup.so
+
+# Image Generation (optional)
+HUGGINGFACE_API_KEY=your_huggingface_api_key  # For image generation - get from huggingface.co
 
 # Admin Notifications (choose one or both)
 ENABLE_DISCORD_ADMIN=true                    # Recommended (free, unlimited)
@@ -527,7 +567,7 @@ make clean
 # Start Telegram tunnel only
 make tunnel-telegram
 
-# Start Vonage/WhatsApp tunnel only
+# Start Vonage/WhatsApp tunnel only (if using WhatsApp)
 make tunnel-vonage
 
 # Stop all tunnels
@@ -539,6 +579,8 @@ make kill-server
 # Stop everything (server + tunnels)
 make kill-all
 ```
+
+**Note**: If using Discord-only admin notifications, you only need the Telegram tunnel.
 
 ### What's Running?
 
@@ -565,6 +607,44 @@ Use `make logs` to tail the server logs in real-time.
 
 ---
 
+## 📁 Project Structure
+
+```
+voice2app/
+├── packages/           # Core system modules
+│   ├── analyzer/       # AI-powered analysis
+│   ├── codegen/        # Code generation (Groq/OpenAI/Anthropic)
+│   ├── notifier/       # Dual-channel notifications (Telegram + Admin)
+│   ├── planner/        # Task planning and STT
+│   ├── router/         # AI Router - Intent detection and routing
+│   │   ├── adapters/   # Tool adapters (Q&A, App, Image, Video)
+│   │   └── services/   # Linkup web search integration
+│   ├── runner/         # Sandboxed execution and screenshots
+│   ├── shared/         # Shared utilities, config, logger
+│   └── telegram-gateway/ # Telegram bot orchestrator
+├── logs/              # All log files (server, tunnels)
+│   ├── server.log
+│   ├── telegram-tunnel.log
+│   └── vonage-tunnel.log
+├── tests/             # Test files (future)
+├── sandbox/           # Generated app sandboxes (git-ignored)
+├── artifacts/         # Screenshots and build outputs (git-ignored)
+├── scripts/           # Setup and utility scripts
+├── docs/              # Additional documentation
+├── Makefile           # Development commands
+├── server.ts          # Main server entry point
+└── .env               # Environment configuration
+```
+
+**Directory Highlights**:
+- **`packages/`**: Modular architecture - each package is independent
+- **`logs/`**: Centralized log management (use `make logs` to view)
+- **`tests/`**: Ready for unit and integration tests
+- **`sandbox/`**: Each job gets its own isolated environment
+- **`artifacts/`**: Screenshots and build artifacts for each job
+
+---
+
 ## 🎯 Feature Highlights
 
 ### 🎤 **Voice-to-Voice Communication**
@@ -581,9 +661,18 @@ Send voice messages and receive voice responses! The system:
 > 🔊 Bot: "Task to create a counter app was successfully executed..." (voice)  
 > 📝 Bot: [Full details with screenshot]
 
-### 📱 **WhatsApp Admin Dashboard**
+### 📢 **Admin Dashboard (Discord or WhatsApp)**
 
-Real-time monitoring of all customer activity via WhatsApp:
+Real-time monitoring of all customer activity via your preferred channel:
+
+**Discord (Recommended)**:
+- Rich embeds with color-coded status (green=success, yellow=partial, red=error)
+- Unlimited notifications (no rate limits)
+- Team collaboration support
+- Free forever
+- See [docs/DISCORD_ADMIN.md](./docs/DISCORD_ADMIN.md) for setup
+
+**WhatsApp (Optional)**:
 
 **New Request Notification**:
 ```
@@ -827,11 +916,19 @@ make dev
 - Verify model is `scribe_v1` in `packages/planner/providers/elevenlabs-stt.ts`
 - Check server logs: `make logs`
 
-### No WhatsApp Notifications
+### No Admin Notifications
 
+**Discord**:
+- Verify `DISCORD_WEBHOOK_URL` is set in `.env`
+- Test webhook: `curl -X POST -H "Content-Type: application/json" -d '{"content":"Test"}' YOUR_WEBHOOK_URL`
+- Check server logs: `make logs`
+- Ensure `ENABLE_DISCORD_ADMIN=true` in `.env`
+
+**WhatsApp**:
 - Verify `VONAGE_WHATSAPP_TO` is set in `.env`
 - Check WhatsApp number format: `34622035636` (no + or spaces)
-- Look for errors in server logs
+- Ensure `ENABLE_WHATSAPP_ADMIN=true` in `.env`
+- Look for rate limit errors in server logs
 
 ### Voice Responses Too Long
 
@@ -849,15 +946,25 @@ make dev
 **"Must provide file parameter"** (ElevenLabs):
 - Fixed in latest version - using `scribe_v1` model
 
+**Rate Limits (WhatsApp)**:
+- Switch to Discord for unlimited notifications: `ENABLE_DISCORD_ADMIN=true`
+- Disable WhatsApp to avoid rate limits: `ENABLE_WHATSAPP_ADMIN=false`
+- See [docs/DISCORD_ADMIN.md](./docs/DISCORD_ADMIN.md)
+
 ---
 
 ## 📖 Additional Documentation
 
+### Setup Guides
 - **[QUICKSTART.md](./QUICKSTART.md)** - Detailed setup instructions
-- **[docs/DISCORD_ADMIN.md](./docs/DISCORD_ADMIN.md)** - Discord admin setup (recommended!)
-- **[docs/ADMIN_NOTIFICATIONS.md](./docs/ADMIN_NOTIFICATIONS.md)** - WhatsApp admin guide
-- **[docs/AI_ROUTER.md](./docs/AI_ROUTER.md)** - AI Router and multi-tool system
+- **[docs/DISCORD_ADMIN.md](./docs/DISCORD_ADMIN.md)** - **⭐ Discord admin setup (recommended!)**
+- **[docs/ADMIN_NOTIFICATIONS.md](./docs/ADMIN_NOTIFICATIONS.md)** - WhatsApp admin guide (optional)
 - **[docs/PROVIDERS.md](./docs/PROVIDERS.md)** - AI provider configuration
+
+### System Documentation
+- **[docs/AI_ROUTER.md](./docs/AI_ROUTER.md)** - **⭐ AI Router and multi-tool system**
+- **[docs/IMAGE_GENERATION.md](./docs/IMAGE_GENERATION.md)** - Image generation setup and usage
+- **[docs/FEATURES_SUMMARY.md](./docs/FEATURES_SUMMARY.md)** - Complete feature overview
 - **[CHANGES.md](./CHANGES.md)** - Changelog and version history
 
 ---

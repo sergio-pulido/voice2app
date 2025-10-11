@@ -7,6 +7,29 @@ import { searchWeb, shouldUseWebSearch } from '../services/linkup-service'
 import type { Adapter, AdapterInput, AdapterOutput } from '../types'
 
 export class QAAdapter implements Adapter {
+  /**
+   * Retry wrapper for API calls with exponential backoff
+   */
+  private async retryFetch(fn: () => Promise<any>, maxRetries = 3): Promise<any> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await fn()
+      } catch (error: any) {
+        const is500Error = error.message?.includes('500') || error.message?.includes('Internal Server Error')
+        const isLastAttempt = attempt === maxRetries
+        
+        if (is500Error && !isLastAttempt) {
+          const delay = Math.pow(2, attempt - 1) * 1000 // 1s, 2s, 4s
+          logger.warn(`⚠️  API error (attempt ${attempt}/${maxRetries}), retrying in ${delay}ms...`)
+          await new Promise(resolve => setTimeout(resolve, delay))
+          continue
+        }
+        
+        throw error
+      }
+    }
+  }
+  
   async run(input: AdapterInput): Promise<AdapterOutput> {
     logger.info('💬 Running Q&A adapter...')
     
@@ -23,7 +46,7 @@ export class QAAdapter implements Adapter {
       
       // Step 1: Ask Groq to answer AND assess if it needs more information
       logger.info('🤖 Step 1: Asking Groq to assess complexity...')
-      const initialResult = await this.assessAndAnswer(question)
+      const initialResult = await this.retryFetch(() => this.assessAndAnswer(question))
       
       // Step 2: If Groq says it needs more info, use Linkup
       let finalAnswer = initialResult.answer
@@ -38,17 +61,17 @@ export class QAAdapter implements Adapter {
           
           // Step 3: Ask Groq again with search context for detailed answer
           logger.info('🤖 Step 3: Generating detailed answer with search results...')
-          finalAnswer = await this.answerWithContext(question, searchContext)
+          finalAnswer = await this.retryFetch(() => this.answerWithContext(question, searchContext))
           usedWebSearch = true
         } catch (error) {
           logger.warn('Linkup search failed, falling back to simple answer:', error)
           // Fallback: Just answer without search
-          finalAnswer = await this.simpleAnswer(question)
+          finalAnswer = await this.retryFetch(() => this.simpleAnswer(question))
         }
       } else if (initialResult.needsMoreInfo && !config.linkupApiKey) {
         logger.warn('⚠️  Complex question but Linkup not configured, answering with LLM only')
         // Answer as best as we can without search
-        finalAnswer = await this.simpleAnswer(question)
+        finalAnswer = await this.retryFetch(() => this.simpleAnswer(question))
       }
       
       const processingTime = Date.now() - startTime
@@ -73,8 +96,24 @@ export class QAAdapter implements Adapter {
     } catch (error) {
       logger.error('Q&A adapter error:', error)
       
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      const is500Error = errorMessage.includes('500') || errorMessage.includes('Internal Server Error')
+      
+      let userMessage = '❌ Sorry, I couldn\'t answer your question.\n\n'
+      
+      if (is500Error) {
+        userMessage += '🔧 The AI service is temporarily experiencing issues.\n\n'
+        userMessage += '💡 Please try again in a few seconds. This is usually a temporary problem with Groq\'s servers.'
+      } else if (errorMessage.includes('401') || errorMessage.includes('403')) {
+        userMessage += '🔑 API authentication error. Please check your API keys in the .env file.'
+      } else if (errorMessage.includes('429')) {
+        userMessage += '⏱️  Rate limit reached. Please wait a moment and try again.'
+      } else {
+        userMessage += `Error: ${errorMessage}\n\nPlease try again or rephrase your question.`
+      }
+      
       return {
-        summaryText: `❌ Sorry, I couldn't answer your question: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        summaryText: userMessage,
         metadata: {
           category: 'qa',
           processingTime: Date.now() - startTime,
@@ -114,20 +153,25 @@ export class QAAdapter implements Adapter {
             role: 'system',
             content: `You are a helpful assistant. Your task is to answer questions and decide if web search is needed.
 
-🟢 SIMPLE questions (answer directly from your knowledge):
-- Basic facts: "What is the capital of Spain?" → Answer "Madrid 🇪🇸"
-- Simple definitions: "What is photosynthesis?" → Explain in 2-3 sentences
-- Common knowledge: "Who invented the telephone?" → Answer directly
+🟢 SIMPLE questions (answer directly - one straightforward fact):
+- Single facts: "What is the capital of Spain?" → Answer "Madrid 🇪🇸"
+- Yes/no questions: "Is water H2O?" → Answer "Yes"
 - Basic math: "What is 15% of 200?" → Calculate and answer
+- Single item: "Who invented the telephone?" → Answer directly
 
-🔴 COMPLEX questions (need web search for accuracy/completeness):
-- Detailed explanations requiring comprehensive understanding: "Explain how quantum computing works" or "Explain the European Union in detail"
-- Current/time-sensitive data: "Microsoft's revenue for 2024", "Latest AI news", "Current crypto prices"
-- Multi-step processes: "How does the stock market work step by step"
-- Recent events: "What happened at COP28?" or "Latest on climate change"
+🔴 COMPLEX questions (need web search - requires comprehensive info):
+- Multiple parts: "Which hormones exist and how do they work?" → NEEDS_SEARCH
+- Detailed explanations: "Explain how quantum computing works" → NEEDS_SEARCH
+- "How does X work?" when X is complex → NEEDS_SEARCH
+- Lists with explanations: "What are the main X and what do they do?" → NEEDS_SEARCH
+- Current data: "Microsoft's revenue for 2024", "Latest AI news" → NEEDS_SEARCH
+- Multi-step processes: "How does the stock market work step by step" → NEEDS_SEARCH
+
+IMPORTANT RULE:
+- If the question has multiple parts (AND, OR, "how do they work", "what are they useful for") → It's COMPLEX
 
 FOR SIMPLE QUESTIONS:
-Answer normally in 2-4 sentences with emojis. Be helpful and friendly.
+Answer in 1-2 sentences with emojis.
 
 FOR COMPLEX QUESTIONS:
 Type EXACTLY: "NEEDS_SEARCH:" and nothing else. No explanation. I'll fetch web data for you.`
@@ -147,7 +191,7 @@ Type EXACTLY: "NEEDS_SEARCH:" and nothing else. No explanation. I'll fetch web d
       throw new Error(`LLM API error: ${response.status} - ${errorText}`)
     }
     
-    const data = await response.json()
+    const data: any = await response.json()
     const content = data.choices[0]?.message?.content || 'No answer generated'
     
     // Check if Groq wants more information (check if NEEDS_SEARCH appears anywhere)
@@ -204,7 +248,7 @@ Type EXACTLY: "NEEDS_SEARCH:" and nothing else. No explanation. I'll fetch web d
       throw new Error(`LLM API error: ${response.status} - ${errorText}`)
     }
     
-    const data = await response.json()
+    const data: any = await response.json()
     return data.choices[0]?.message?.content || 'No answer generated'
   }
   
@@ -251,7 +295,7 @@ Type EXACTLY: "NEEDS_SEARCH:" and nothing else. No explanation. I'll fetch web d
       throw new Error(`LLM API error: ${response.status} - ${errorText}`)
     }
     
-    const data = await response.json()
+    const data: any = await response.json()
     const answer = data.choices[0]?.message?.content || 'No answer generated'
     
     logger.success('Detailed answer generated with search context')

@@ -45,7 +45,8 @@ export class AppCodeAdapter implements Adapter {
       
       // Step 3: Running
       logger.info('🏃 Step 3: Running app...')
-      const runnerResult = await runApp(task.jobId)
+      const sandboxPath = codegenResult.sandboxPath || `sandbox/${task.jobId}`
+      const runnerResult = await runApp(task, sandboxPath)
       
       // Step 4: Analysis
       logger.info('📊 Step 4: Analyzing results...')
