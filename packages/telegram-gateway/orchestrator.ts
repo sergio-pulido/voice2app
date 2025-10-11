@@ -85,7 +85,7 @@ export async function orchestrate(options: OrchestrateOptions): Promise<void> {
     logger.success(`${categoryEmoji} Routed to: ${categoryName}`)
     
     // Build customer notification message
-    let customerMessage = `${categoryEmoji} **${categoryName}**\n\n${result.summaryText}`
+    let customerMessage = `*${categoryName}*\n\n${result.summaryText}`
     
     // Send result to customer (Telegram)
     await sendNotification({

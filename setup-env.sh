@@ -16,6 +16,9 @@ TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
 GROQ_API_KEY=your_groq_api_key_here
 ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
 
+# Q&A Enhancement (optional - for web search)
+LINKUP_API_KEY=your_linkup_api_key_here
+
 # Provider Selection
 STT_PROVIDER=elevenlabs
 LLM_PROVIDER=groq
@@ -53,9 +56,14 @@ echo "• TELEGRAM_BOT_TOKEN: From @BotFather on Telegram"
 echo "• GROQ_API_KEY: From console.groq.com (free tier available)"
 echo "• ELEVENLABS_API_KEY: From elevenlabs.io (for voice features)"
 echo ""
+echo "📋 Optional (Enhanced Q&A):"
+echo "• LINKUP_API_KEY: From linkup.so (for web search in Q&A)"
+echo ""
 echo "📋 Optional (Admin Notifications):"
 echo "• DISCORD_WEBHOOK_URL: Discord Server Settings → Integrations → Webhooks (FREE!)"
 echo "• VONAGE credentials: Only if you want WhatsApp admin notifications (has costs)"
 echo ""
-echo "💡 Recommendation: Use Discord for admin notifications (free & unlimited)"
+echo "💡 Recommendations:"
+echo "  • Use Linkup for factual Q&A (capital cities, current events, etc.)"
+echo "  • Use Discord for admin notifications (free & unlimited)"
 echo ""

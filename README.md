@@ -112,10 +112,11 @@ Customer (Telegram)                        Admin (WhatsApp)
 
 The system now intelligently routes requests to different tools:
 
-**💬 Q&A** - Answer questions about anything:
-- "What is the capital of Spain?"
-- "How do I learn React?"
-- "Explain quantum computing"
+**💬 Q&A** - Answer questions with LLM + Web Search:
+- "What is the capital of Spain?" (web search enabled)
+- "What is Microsoft's revenue for 2024?" (real-time data)
+- "Explain quantum computing" (LLM knowledge)
+- Uses **Linkup** for factual queries + **Groq LLM** for answers
 
 **💻 App Builder** - Generate complete applications (core feature):
 - "Create a counter app"
@@ -409,6 +410,9 @@ ANTHROPIC_API_KEY=your_anthropic_api_key    # Alternative
 # Speech-to-Text (choose one)
 ELEVENLABS_API_KEY=your_elevenlabs_api_key  # Recommended (scribe_v1)
 # OR use OPENAI_API_KEY for Whisper
+
+# Q&A Enhancement (optional but recommended)
+LINKUP_API_KEY=your_linkup_api_key  # For web search - get from linkup.so
 
 # Admin Notifications (choose one or both)
 ENABLE_DISCORD_ADMIN=true                    # Recommended (free, unlimited)
