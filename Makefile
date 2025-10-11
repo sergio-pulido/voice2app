@@ -1,4 +1,4 @@
-.PHONY: help dev server tunnels tunnel-telegram tunnel-vonage clean kill-server kill-tunnels kill-all logs
+.PHONY: help dev server tunnels tunnel-telegram tunnel-vonage setup-webhook clean kill-server kill-tunnels kill-all logs
 
 # Default target
 help:
@@ -10,6 +10,7 @@ help:
 	@echo "  make tunnels          - Start both Hookdeck tunnels"
 	@echo "  make tunnel-telegram  - Start Telegram tunnel only"
 	@echo "  make tunnel-vonage    - Start Vonage tunnel only"
+	@echo "  make setup-webhook    - Configure Telegram webhook with current Hookdeck URL"
 	@echo "  make logs             - Show server logs"
 	@echo "  make clean            - Kill all processes and clean up"
 	@echo "  make kill-server      - Kill the server only"
@@ -76,6 +77,11 @@ tunnel-vonage:
 	@echo "🔌 Starting Vonage tunnel..."
 	@pkill -f "hookdeck listen.*vonage-whatsapp" 2>/dev/null || true
 	@hookdeck listen 3020 vonage-whatsapp --path /vonage
+
+# Set up Telegram webhook with current Hookdeck URL
+setup-webhook:
+	@echo "📡 Configuring Telegram webhook..."
+	@bun run setup-telegram-webhook.ts
 
 # Show server logs
 logs:
