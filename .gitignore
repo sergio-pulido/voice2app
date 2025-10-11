@@ -146,3 +146,5 @@ sandbox/
 artifacts/
 !sandbox/.gitkeep
 !artifacts/.gitkeep
+
+logs/

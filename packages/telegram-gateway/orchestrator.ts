@@ -1,14 +1,11 @@
 /**
- * Main orchestrator: coordinates all packages
+ * Main orchestrator: coordinates all packages with AI routing
  */
 
 import { logger, config } from '../shared'
 import { sendWhatsAppMessage } from '../shared/whatsapp'
-import { processInput } from '../planner'
-import { generateApp } from '../codegen'
-import { runApp } from '../runner'
-import { analyzeResults } from '../analyzer'
 import { sendNotification, sendAcknowledgment, sendError } from '../notifier'
+import { routeRequest, getCategoryName, getCategoryEmoji, type IntentCategory } from '../router'
 
 interface OrchestrateOptions {
   chatId: number
@@ -34,95 +31,71 @@ export async function orchestrate(options: OrchestrateOptions): Promise<void> {
   const { chatId, messageId, voiceBuffer, textMessage, username } = options
   
   const startTime = Date.now()
-  logger.info('🚀 Starting orchestration...')
+  logger.info('🚀 Starting orchestration with AI routing...')
   
   try {
     // Send acknowledgment to Telegram
     await sendAcknowledgment(chatId, voiceBuffer ? 'voice' : 'text')
     
-    // Send detailed admin notification to WhatsApp
+    // Prepare input for router
     const messageType = voiceBuffer ? 'voice' : 'text'
+    const inputText = textMessage || '[Voice message - will be transcribed]'
     const inputPreview = textMessage || (voiceBuffer ? `[Voice: ${Math.round(voiceBuffer.length / 1024)}KB]` : '[No input]')
     
+    // Send initial admin notification
     await sendAdminNotification(
       `🔔 NEW REQUEST\n` +
       `👤 User: ${username || 'Unknown'} (${chatId})\n` +
       `📱 Type: ${messageType === 'voice' ? '🎤 Voice' : '📝 Text'}\n` +
       `💬 Input: ${inputPreview.substring(0, 100)}${inputPreview.length > 100 ? '...' : ''}\n` +
       `⏰ Started: ${new Date().toLocaleTimeString()}\n` +
-      `🔄 Status: Processing...`
+      `🔄 Status: Analyzing intent...`
     )
     
-    // Step 1: Planner (STT + Task Planning)
-    logger.info('📋 Step 1: Planning...')
-    const plannerResult = await processInput(chatId, messageId, voiceBuffer, textMessage)
+    // Route the request through the AI router
+    logger.info('🧠 Routing request...')
+    const result = await routeRequest({
+      text: inputText,
+      userId: chatId,
+      username,
+      transcription: undefined, // Will be set by adapter if needed
+      voiceBuffer
+    })
     
-    if (plannerResult.error) {
-      throw new Error(`Planning failed: ${plannerResult.error}`)
-    }
+    const category = result.metadata?.routedTo || 'app_code'
+    const categoryName = getCategoryName(category as IntentCategory)
+    const categoryEmoji = getCategoryEmoji(category as IntentCategory)
     
-    const task = plannerResult.task
-    logger.success(`Task created: ${task.jobId}`)
+    logger.success(`${categoryEmoji} Routed to: ${categoryName}`)
     
-    // Step 2: Codegen
-    logger.info('💻 Step 2: Generating code...')
-    const codegenResult = await generateApp(task)
+    // Build customer notification message
+    let customerMessage = `${categoryEmoji} **${categoryName}**\n\n${result.summaryText}`
     
-    if (!codegenResult.success) {
-      throw new Error(`Code generation failed: ${codegenResult.error}`)
-    }
-    
-    logger.success(`Generated ${codegenResult.files.length} files`)
-    
-    // Step 3: Runner
-    logger.info('🏃 Step 3: Running app...')
-    const runnerResult = await runApp(task, codegenResult.sandboxPath)
-    
-    // Step 4: Analyzer
-    logger.info('📊 Step 4: Analyzing results...')
-    const analysisResult = await analyzeResults(task, runnerResult)
-    
-    // Step 5: Notifier
-    logger.info('📨 Step 5: Sending notification...')
-    
-    // Build notification message
-    let message = `*${analysisResult.status === 'success' ? '✅' : analysisResult.status === 'partial' ? '⚠️' : '❌'} ${task.context}*\n\n`
-    message += `${analysisResult.summary}\n\n`
-    
-    if (analysisResult.suggestions.length > 0) {
-      message += `*💡 Suggestions:*\n`
-      analysisResult.suggestions.forEach((suggestion, i) => {
-        message += `${i + 1}. ${suggestion}\n`
-      })
-    }
-    
-    if (plannerResult.transcription) {
-      message += `\n_Transcribed: "${plannerResult.transcription}"_`
-    }
-    
+    // Send result to customer (Telegram)
     await sendNotification({
       chatId,
-      text: message,
-      screenshot: runnerResult.screenshot,
+      text: customerMessage,
+      screenshot: result.attachments?.[0], // First attachment if any
       voice: !!voiceBuffer,  // Send voice reply if input was voice
     })
     
-    // Send detailed admin notification to WhatsApp
+    // Send detailed admin completion notification
     const processingTime = ((Date.now() - startTime) / 1000).toFixed(1)
-    const statusEmoji = analysisResult.status === 'success' ? '✅' : analysisResult.status === 'partial' ? '⚠️' : '❌'
+    const status = result.metadata?.status || 'success'
+    const statusEmoji = status === 'success' ? '✅' : status === 'partial' ? '⚠️' : '❌'
     
     await sendAdminNotification(
       `${statusEmoji} REQUEST COMPLETED\n` +
       `👤 User: ${username || 'Unknown'} (${chatId})\n` +
-      `📋 Task: ${task.context}\n` +
+      `🎯 Tool: ${categoryName}\n` +
+      `📋 Task: ${inputPreview.substring(0, 80)}\n` +
       `⏱️  Time: ${processingTime}s\n` +
-      `📊 Status: ${analysisResult.status.toUpperCase()}\n` +
-      `📦 Files: ${codegenResult.files?.length || 0} generated\n` +
-      `🎯 Project: ${task.project || 'N/A'}\n` +
-      `🔧 Intent: ${task.intent || 'N/A'}\n` +
-      (plannerResult.transcription ? `🎤 Transcription: "${plannerResult.transcription}"\n` : '') +
-      `\n📝 Summary:\n${analysisResult.summary.substring(0, 200)}${analysisResult.summary.length > 200 ? '...' : ''}\n` +
-      (analysisResult.suggestions.length > 0 ? `\n💡 Suggestions: ${analysisResult.suggestions.length} provided` : '')
+      `📊 Status: ${status.toUpperCase()}\n` +
+      (result.metadata?.filesGenerated ? `📦 Files: ${result.metadata.filesGenerated} generated\n` : '') +
+      (result.metadata?.project ? `🎯 Project: ${result.metadata.project}\n` : '') +
+      (result.metadata?.intent ? `🔧 Intent: ${result.metadata.intent}\n` : '') +
+      (result.metadata?.transcription ? `🎤 Transcription: "${result.metadata.transcription}"\n` : '') +
+      `\n📝 Summary:\n${result.summaryText.substring(0, 200)}${result.summaryText.length > 200 ? '...' : ''}`
     )
     
     logger.success('🎉 Orchestration complete!')

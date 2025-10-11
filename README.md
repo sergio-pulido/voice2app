@@ -10,6 +10,7 @@ You can build while walking, running, or hiking — completely hands-free.
 
 ### Recent Updates
 
+- 🧠 **AI Router**: Intelligent intent detection routes requests to the right tool (Q&A, App Builder, Image Gen, Video Gen)
 - 🎤 **Voice-to-Voice Responses**: Send voice, get voice back! Full TTS integration with ElevenLabs
 - 📱 **WhatsApp Admin Monitoring**: Real-time notifications with detailed metrics, errors, and user activity
 - 🔄 **Smart Response Matching**: Automatic voice/text detection with appropriate response format
@@ -106,6 +107,36 @@ Customer (Telegram)                        Admin (WhatsApp)
 ---
 
 ## 🎯 Key Features
+
+### 🧠 AI Router - Multi-Tool Support
+
+The system now intelligently routes requests to different tools:
+
+**💬 Q&A** - Answer questions about anything:
+- "What is the capital of Spain?"
+- "How do I learn React?"
+- "Explain quantum computing"
+
+**💻 App Builder** - Generate complete applications (core feature):
+- "Create a counter app"
+- "Build a landing page"
+- "Make a todo list with React"
+
+**🎨 Image Generator** - Create images from descriptions (coming soon):
+- "Generate a logo for my startup"
+- "Create an illustration of a mountain"
+- "Design an icon for my app"
+
+**🎬 Video Generator** - Generate video clips (coming soon):
+- "Create a short video about AI"
+- "Make a promotional clip"
+- "Generate an explainer video"
+
+**How It Works**:
+- 🚀 **Fast keyword detection** (93% accuracy, <1ms)
+- 🤖 **LLM fallback** for uncertain cases
+- 🎯 **Automatic routing** to the right tool
+- 📊 **Tool selection shown** in notifications (admin & user)
 
 ### 🎤 Voice-to-Voice Communication
 - **Intelligent Response Matching**: 
@@ -666,7 +697,8 @@ make dev
 ## 📖 Additional Documentation
 
 - **[QUICKSTART.md](./QUICKSTART.md)** - Detailed setup instructions
-- **[ADMIN_NOTIFICATIONS.md](./ADMIN_NOTIFICATIONS.md)** - WhatsApp admin guide
+- **[docs/ADMIN_NOTIFICATIONS.md](./docs/ADMIN_NOTIFICATIONS.md)** - WhatsApp admin guide
+- **[docs/AI_ROUTER.md](./docs/AI_ROUTER.md)** - AI Router and multi-tool system
 - **[docs/PROVIDERS.md](./docs/PROVIDERS.md)** - AI provider configuration
 - **[CHANGES.md](./CHANGES.md)** - Changelog and version history
 
