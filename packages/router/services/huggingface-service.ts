@@ -18,6 +18,7 @@ function getClient(): HfInference {
     if (!config.huggingfaceApiKey) {
       throw new Error('HUGGINGFACE_API_KEY not configured')
     }
+    // Use HuggingFace's public inference API (works with your updated token)
     hfClient = new HfInference(config.huggingfaceApiKey)
   }
   return hfClient
@@ -33,7 +34,7 @@ export async function generateImage(prompt: string): Promise<string> {
     
     const client = getClient()
     
-    // Use Stable Diffusion XL for high-quality images
+    // Use Stable Diffusion XL for high-quality images (now that you have correct permissions)
     const model = 'stabilityai/stable-diffusion-xl-base-1.0'
     
     logger.debug(`Using model: ${model}`)
@@ -66,9 +67,27 @@ export async function generateImage(prompt: string): Promise<string> {
     logger.success(`Image generated and saved: ${filename} (${Math.round(buffer.length / 1024)}KB)`)
     
     return filepath
-  } catch (error) {
-    logger.error('HuggingFace image generation error:', error)
-    throw error
+  } catch (error: any) {
+    const errorMessage = error?.message || error?.toString() || 'Unknown error'
+    const errorDetails = error?.response?.data || error?.data || ''
+    
+    logger.error('HuggingFace image generation error:', errorMessage)
+    if (errorDetails) {
+      logger.error('Error details:', errorDetails)
+    }
+    
+    // Create a more descriptive error
+    const detailedError = new Error(
+      errorMessage.includes('Model') ? 
+        'HuggingFace model is loading. Please try again in 20-30 seconds.' :
+      errorMessage.includes('rate limit') || errorMessage.includes('429') ?
+        'HuggingFace API rate limit reached. Please wait a moment.' :
+      errorMessage.includes('401') || errorMessage.includes('403') ?
+        'Invalid HuggingFace API key. Please check HUGGINGFACE_API_KEY in .env' :
+        `HuggingFace API error: ${errorMessage}`
+    )
+    
+    throw detailedError
   }
 }
 
@@ -77,23 +96,29 @@ export async function generateImage(prompt: string): Promise<string> {
  */
 export async function generateImageWithRetry(
   prompt: string,
-  maxRetries: number = 2
+  maxRetries: number = 3
 ): Promise<string | null> {
+  let lastError: Error | null = null
+  
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       return await generateImage(prompt)
-    } catch (error) {
-      logger.warn(`Image generation failed (attempt ${attempt}/${maxRetries})`)
+    } catch (error: any) {
+      lastError = error
+      const errorMsg = error?.message || 'Unknown error'
+      logger.warn(`Image generation failed (attempt ${attempt}/${maxRetries}): ${errorMsg}`)
       
       if (attempt < maxRetries) {
-        const delay = 2000 * attempt
-        logger.info(`Retrying in ${delay}ms...`)
+        // Longer delays for model loading
+        const delay = attempt === 1 ? 5000 : 10000 // 5s, 10s, 15s
+        logger.info(`Retrying in ${delay / 1000}s...`)
         await new Promise(resolve => setTimeout(resolve, delay))
       }
     }
   }
   
   logger.error(`Failed to generate image after ${maxRetries} attempts`)
+  logger.error(`Last error: ${lastError?.message}`)
   return null
 }
 

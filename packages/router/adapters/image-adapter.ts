@@ -48,9 +48,7 @@ export class ImageAdapter implements Adapter {
       const response = 
         `🎨 **Image Generated!**\n\n` +
         `Prompt: "${prompt}"\n\n` +
-        `Your AI-generated image is ready! ✨\n\n` +
-        `Generated with: Stable Diffusion XL\n` +
-        `Time: ${(processingTime / 1000).toFixed(1)}s`
+        `Generated with: Stable Diffusion XL • ${(processingTime / 1000).toFixed(1)}s`
       
       return {
         summaryText: response,
@@ -69,20 +67,38 @@ export class ImageAdapter implements Adapter {
       
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       
+      let userMessage = `❌ **Image Generation Failed**\n\n`
+      userMessage += `Prompt: "${prompt}"\n\n`
+      
+      // Provide specific guidance based on error type
+      if (errorMessage.includes('model is loading') || errorMessage.includes('Model')) {
+        userMessage += `⏳ The AI model is warming up (cold start).\n\n`
+        userMessage += `💡 **Please wait 20-30 seconds and try again.**\n\n`
+        userMessage += `This happens when the model hasn't been used recently.`
+      } else if (errorMessage.includes('rate limit')) {
+        userMessage += `⏱️  API rate limit reached.\n\n`
+        userMessage += `💡 **Please wait a few minutes and try again.**`
+      } else if (errorMessage.includes('API key') || errorMessage.includes('401') || errorMessage.includes('403')) {
+        userMessage += `🔑 API key issue.\n\n`
+        userMessage += `💡 Please check HUGGINGFACE_API_KEY in your .env file.\n`
+        userMessage += `Get a free key from: https://huggingface.co`
+      } else {
+        userMessage += `Error: ${errorMessage}\n\n`
+        userMessage += `💡 Common solutions:\n`
+        userMessage += `• Wait 30 seconds (model may be loading)\n`
+        userMessage += `• Try a simpler prompt\n`
+        userMessage += `• Check your HuggingFace API key\n`
+        userMessage += `• Try again later if HF is having issues`
+      }
+      
       return {
-        summaryText: 
-          `❌ **Image Generation Failed**\n\n` +
-          `Prompt: "${prompt}"\n\n` +
-          `Error: ${errorMessage}\n\n` +
-          `💡 This might be due to:\n` +
-          `• HuggingFace API rate limits\n` +
-          `• Model loading (try again in 30 seconds)\n` +
-          `• Invalid prompt\n\n` +
-          `Please try again or try a different prompt!`,
+        summaryText: userMessage,
+        ttsText: `Image generation failed. ${errorMessage.includes('loading') ? 'Model is loading, try again in 30 seconds' : 'Please try again'}`,
         metadata: {
           category: 'image_gen',
           processingTime: Date.now() - startTime,
-          status: 'error'
+          status: 'error',
+          error: errorMessage
         }
       }
     }

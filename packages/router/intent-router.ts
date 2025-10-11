@@ -102,26 +102,61 @@ function fastClassify(text: string): IntentResult | null {
 }
 
 /**
- * LLM-based classification fallback
+ * Keyword-based classification fallback (when Groq fails)
  */
 async function llmClassify(text: string): Promise<IntentResult> {
-  // For now, use a simple heuristic
-  // TODO: Implement actual LLM classification
+  const lowerText = text.toLowerCase()
   
-  // If text is short and looks like a question, assume Q&A
-  if (text.length < 100 && (text.includes('?') || text.match(/^(what|which|where|when|who|how|why|qué|cuál|dónde|cuándo|quién|cómo|por qué)/i))) {
+  // Image generation keywords
+  const imageKeywords = [
+    'image', 'imagen', 'picture', 'photo', 'foto',
+    'generate', 'genera', 'create', 'crea',
+    'logo', 'illustration', 'ilustración',
+    'draw', 'dibuja', 'paint', 'sketch'
+  ]
+  
+  // Check for image generation (high priority)
+  const hasImageKeyword = imageKeywords.some(kw => lowerText.includes(kw))
+  const wantsImage = lowerText.match(/\b(i want|quiero|dame|give me|generate|create).*(image|imagen|picture|logo|illustration)/i)
+  
+  if (hasImageKeyword || wantsImage) {
     return {
-      category: 'qa',
-      confidence: 0.7,
-      reasoning: 'Short question detected'
+      category: 'image_gen',
+      confidence: 0.8,
+      reasoning: 'Image generation keywords detected (fallback)'
     }
   }
   
-  // If uncertain, default to Q&A (safest option - won't break things)
+  // App building keywords
+  const appKeywords = [
+    'create app', 'build app', 'make app',
+    'create page', 'build page', 'make page',
+    'create component', 'build site', 'website',
+    'landing page', 'todo', 'counter'
+  ]
+  
+  if (appKeywords.some(kw => lowerText.includes(kw))) {
+    return {
+      category: 'app_code',
+      confidence: 0.7,
+      reasoning: 'App building keywords detected (fallback)'
+    }
+  }
+  
+  // Video generation keywords
+  if (lowerText.match(/\b(video|clip|animation|animate)/i)) {
+    return {
+      category: 'video_gen',
+      confidence: 0.7,
+      reasoning: 'Video keywords detected (fallback)'
+    }
+  }
+  
+  // Default to Q&A (safest option)
   return {
     category: 'qa',
-    confidence: 0.5,
-    reasoning: 'Default to Q&A (can handle any text)'
+    confidence: 0.6,
+    reasoning: 'Default to Q&A (fallback)'
   }
 }
 
@@ -169,19 +204,23 @@ async function groqClassify(text: string): Promise<IntentResult> {
   
   const model = isGroq ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini'
   
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          {
-            role: 'system',
-            content: `You are an intent classifier. Classify the user's request into ONE of these categories:
+  // Retry logic for Groq (up to 2 attempts)
+  let lastError: Error | null = null
+  
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            {
+              role: 'system',
+              content: `You are an intent classifier. Classify the user's request into ONE of these categories:
 
 1. "qa" - Questions, explanations, information requests
    Examples: "What is X?", "Explain Y", "Tell me about Z", "How does X work?"
@@ -190,7 +229,7 @@ async function groqClassify(text: string): Promise<IntentResult> {
    Examples: "Create a counter app", "Build a landing page", "Make a todo list"
 
 3. "image_gen" - Generating images, logos, illustrations
-   Examples: "Generate a logo", "Create an image of X", "Draw a picture"
+   Examples: "Generate a logo", "Create an image of X", "Draw a picture", "I want an image of X"
 
 4. "video_gen" - Generating videos, clips, animations
    Examples: "Create a video", "Make a clip", "Generate video about X"
@@ -198,40 +237,58 @@ async function groqClassify(text: string): Promise<IntentResult> {
 Respond with ONLY ONE WORD: qa, app_code, image_gen, or video_gen
 
 Default to "qa" if uncertain.`
-          },
-          {
-            role: 'user',
-            content: text
-          }
-        ],
-        temperature: 0.3,
-        max_tokens: 10
+            },
+            {
+              role: 'user',
+              content: text
+            }
+          ],
+          temperature: 0.3,
+          max_tokens: 10
+        })
       })
-    })
+      
+      if (!response.ok) {
+        const is500 = response.status === 500
+        if (is500 && attempt < 2) {
+          logger.warn(`Groq classification failed (${response.status}), retrying...`)
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          continue
+        }
+        logger.warn('Groq classification failed, using fallback')
+        return llmClassify(text)
+      }
     
-    if (!response.ok) {
-      logger.warn('Groq classification failed, using fallback')
+      const data: any = await response.json()
+      const result = data.choices[0]?.message?.content?.trim().toLowerCase() || 'qa'
+      
+      // Validate the response
+      const validCategories: IntentCategory[] = ['qa', 'app_code', 'image_gen', 'video_gen']
+      const category = validCategories.includes(result as IntentCategory) 
+        ? result as IntentCategory 
+        : 'qa'
+      
+      return {
+        category,
+        confidence: 0.95,
+        reasoning: 'Groq LLM classification'
+      }
+    } catch (error: any) {
+      lastError = error
+      const is500 = error?.message?.includes('500')
+      if (is500 && attempt < 2) {
+        logger.warn(`Groq classification error (attempt ${attempt}), retrying...`)
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        continue
+      }
+      logger.warn('Groq classification error, using fallback:', error)
       return llmClassify(text)
     }
-    
-    const data = await response.json()
-    const result = data.choices[0]?.message?.content?.trim().toLowerCase() || 'qa'
-    
-    // Validate the response
-    const validCategories: IntentCategory[] = ['qa', 'app_code', 'image_gen', 'video_gen']
-    const category = validCategories.includes(result as IntentCategory) 
-      ? result as IntentCategory 
-      : 'qa'
-    
-    return {
-      category,
-      confidence: 0.95,
-      reasoning: 'Groq LLM classification'
-    }
-  } catch (error) {
-    logger.warn('Groq classification error, using fallback:', error)
-    return llmClassify(text)
   }
+  
+  // If we get here, all retries failed
+  logger.warn('All Groq classification attempts failed, using fallback')
+  return llmClassify(text)
 }
 
 /**
