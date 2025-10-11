@@ -47,8 +47,15 @@ export async function planTask(
     
     const content = response.content
     
-    // Parse JSON from response
-    const parsed = JSON.parse(content.trim())
+    // Parse JSON from response - remove markdown code blocks if present
+    let jsonContent = content.trim()
+    
+    // Remove markdown code blocks (```json ... ``` or ``` ... ```)
+    if (jsonContent.startsWith('```')) {
+      jsonContent = jsonContent.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '')
+    }
+    
+    const parsed = JSON.parse(jsonContent.trim())
     
     // Create full task object
     const task: Task = {

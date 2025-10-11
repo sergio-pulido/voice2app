@@ -21,8 +21,13 @@ export async function writeFiles(sandboxPath: string, files: GeneratedFile[]): P
       // Ensure directory exists
       await mkdir(fileDir, { recursive: true })
       
+      // Ensure content is a string
+      const content = typeof file.content === 'string' 
+        ? file.content 
+        : JSON.stringify(file.content, null, 2)
+      
       // Write file
-      await writeFile(filePath, file.content, 'utf-8')
+      await writeFile(filePath, content, 'utf-8')
       
       logger.debug(`  ✓ ${file.path}`)
     }

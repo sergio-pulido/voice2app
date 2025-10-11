@@ -90,7 +90,7 @@ export async function orchestrate(options: OrchestrateOptions): Promise<void> {
       chatId,
       text: message,
       screenshot: runnerResult.screenshot,
-      voice: false,
+      voice: !!voiceBuffer,  // Send voice reply if input was voice
     })
     
     // Send WhatsApp notification if configured
