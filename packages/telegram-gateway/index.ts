@@ -39,6 +39,53 @@ app.post('/telegram', async (c) => {
   return c.json({ ok: true })
 })
 
+// Vonage webhook endpoint for WhatsApp - handle both GET and POST
+app.all('/vonage', async (c) => {
+  const method = c.req.method
+  logger.info(`📱 Vonage webhook received: ${method} request`)
+  
+  try {
+    // Handle GET requests (webhook verification)
+    if (method === 'GET') {
+      logger.info('📱 Vonage webhook verification request')
+      return c.text('OK')
+    }
+    
+    // Handle POST requests (actual webhook data)
+    if (method === 'POST') {
+      const webhookData = await c.req.json()
+      logger.info('📱 Received Vonage webhook data:', JSON.stringify(webhookData, null, 2))
+      
+      // Handle inbound messages
+      if (webhookData.type === 'message' && webhookData.message) {
+        const message = webhookData.message
+        
+        // Log the received WhatsApp message
+        logger.info(`📱 WhatsApp message from ${message.from}: ${message.content?.text || '[non-text message]'}`)
+        
+        // You can process the WhatsApp message here if needed
+        // For now, we'll just acknowledge receipt
+      }
+      
+      // Handle status updates
+      if (webhookData.type === 'status') {
+        const status = webhookData.status
+        logger.info(`📱 WhatsApp message status: ${status.status} for message ${status.message_uuid}`)
+      }
+      
+      return c.json({ ok: true })
+    }
+    
+    // Handle other methods
+    logger.warn(`📱 Unsupported HTTP method: ${method}`)
+    return c.text('Method not allowed', 405)
+    
+  } catch (error) {
+    logger.error('Error processing Vonage webhook:', error)
+    return c.json({ error: 'Invalid webhook data' }, 400)
+  }
+})
+
 async function processMessage(chatId: number, message: any) {
   const messageId = message.message_id
   

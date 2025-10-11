@@ -34,7 +34,7 @@ if (config.hookdeckUrl) {
     }
   })
 } else {
-  logger.warn('⚠️  HOOKDECK_URL not configured. Set it to enable webhook setup.')
+  logger.warn('⚠️  HOOKDECK_TELEGRAM_URL not configured. Set it to enable webhook setup.')
 }
 
 export default server

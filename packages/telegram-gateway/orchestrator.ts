@@ -2,7 +2,8 @@
  * Main orchestrator: coordinates all packages
  */
 
-import { logger } from '../shared'
+import { logger, config } from '../shared'
+// import { sendWhatsAppMessage } from '../shared/whatsapp'
 import { processInput } from '../planner'
 import { generateApp } from '../codegen'
 import { runApp } from '../runner'
@@ -24,6 +25,10 @@ export async function orchestrate(options: OrchestrateOptions): Promise<void> {
   try {
     // Send acknowledgment
     await sendAcknowledgment(chatId, voiceBuffer ? 'voice' : 'text')
+    
+    // Send WhatsApp acknowledgment if configured
+    // TODO: Re-enable after fixing circular dependency
+    // if (config.vonageWhatsAppTo) { ... }
     
     // Step 1: Planner (STT + Task Planning)
     logger.info('📋 Step 1: Planning...')
@@ -79,10 +84,21 @@ export async function orchestrate(options: OrchestrateOptions): Promise<void> {
       voice: false,
     })
     
+    // Send WhatsApp notification if configured
+    // TODO: Re-enable after fixing circular dependency
+    // if (config.vonageWhatsAppTo) { ... }
+    
     logger.success('🎉 Orchestration complete!')
   } catch (error) {
     logger.error('Orchestration error:', error)
-    await sendError(chatId, error instanceof Error ? error.message : 'Unknown error')
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    
+    // Send error to Telegram
+    await sendError(chatId, errorMessage)
+    
+    // Send error to WhatsApp if configured
+    // TODO: Re-enable after fixing circular dependency
+    // if (config.vonageWhatsAppTo) { ... }
   }
 }
 

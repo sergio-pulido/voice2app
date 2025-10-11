@@ -7,7 +7,7 @@ console.log('🧪 Testing webhook setup...')
 console.log('📋 Make sure you have the following environment variables set:')
 console.log('   - TELEGRAM_BOT_TOKEN')
 console.log('   - TELEGRAM_WEBHOOK_SECRET (optional)')
-console.log('   - HOOKDECK_URL (defaults to https://hkdk.events/t77zmlms4o5hnl)')
+console.log('   - HOOKDECK_TELEGRAM_URL (defaults to https://hkdk.events/t77zmlms4o5hnl)')
 console.log('')
 
 await setupTelegramWebhook()

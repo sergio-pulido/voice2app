@@ -97,4 +97,3 @@ export async function sendError(chatId: number, error: string): Promise<void> {
   const text = `❌ Sorry, something went wrong:\n\n${error}\n\nPlease try again!`
   await sendMessage(chatId, text)
 }
-

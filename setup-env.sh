@@ -13,7 +13,13 @@ TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
 TELEGRAM_WEBHOOK_SECRET=your_webhook_secret_here
 
 # Hookdeck Configuration  
-HOOKDECK_URL=https://hkdk.events/k6dddf8z54fd7q
+HOOKDECK_TELEGRAM_URL=https://hkdk.events/k6dddf8z54fd7q
+HOOKDECK_VONAGE_URL=https://hkdk.events/vonage
+
+# Vonage WhatsApp Configuration
+VONAGE_API_KEY=your_vonage_api_key_here
+VONAGE_API_SECRET=your_vonage_api_secret_here
+VONAGE_WHATSAPP_TO=your_whatsapp_number_here
 
 # Server Configuration
 PORT_GATEWAY=3020
@@ -32,5 +38,7 @@ echo "3. Run: source .env && bun run server.ts"
 echo ""
 echo "📋 Required API Keys:"
 echo "• TELEGRAM_BOT_TOKEN: From @BotFather"
-echo "• LOVABLE_API_KEY: From lovable.dev dashboard"
+echo "• VONAGE_API_KEY: From Vonage dashboard (your API key)"
+echo "• VONAGE_API_SECRET: From Vonage dashboard (your API secret)"
+echo "• VONAGE_WHATSAPP_TO: WhatsApp number to send notifications to"
 echo ""

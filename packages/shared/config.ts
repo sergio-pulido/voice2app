@@ -15,7 +15,14 @@ export const config = {
   telegramAdminChatId: process.env.TELEGRAM_ADMIN_CHAT_ID || '',
   hookdeckSecret: process.env.HOOKDECK_SECRET || '',
   telegramWebhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET || '',
-  hookdeckUrl: process.env.HOOKDECK_URL || '',
+  hookdeckUrl: process.env.HOOKDECK_TELEGRAM_URL || '',
+  hookdeckVonageUrl: process.env.HOOKDECK_VONAGE_URL || '',
+  
+  // Vonage WhatsApp
+  vonageApiKey: process.env.VONAGE_API_KEY || '',
+  vonageApiSecret: process.env.VONAGE_API_SECRET || '',
+  vonageWhatsAppFrom: process.env.VONAGE_WHATSAPP_FROM || '14157386102', // Default sandbox number
+  vonageWhatsAppTo: process.env.VONAGE_WHATSAPP_TO || '',
   
   // Provider Selection
   sttProvider: (process.env.STT_PROVIDER || 'openai') as STTProvider,

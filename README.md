@@ -6,6 +6,19 @@ You talk via **Telegram**, the system generates or edits code, runs it in a sand
 captures **screenshots and logs**, analyzes results, and replies back to you.
 You can build while walking, running, or hiking — completely hands-free.
 
+## 🚀 Quick Start
+
+```bash
+# Start everything (server + Hookdeck tunnels)
+make dev
+
+# View logs
+make logs
+
+# Stop everything
+make clean
+```
+
 ---
 
 ## 🧠 Overview
@@ -95,7 +108,7 @@ bun run dev
 
 Then:
 1. In **Hookdeck**, create a Source (Webhook) and Destination (`http://localhost:3020/telegram`)
-2. Add your `HOOKDECK_URL` to `.env` - the server will auto-configure the webhook
+2. Add your `HOOKDECK_TELEGRAM_URL` to `.env` - the server will auto-configure the webhook
 3. Send a voice or text message to your bot:
    > 🎤 "Create a landing page with a big title 'Hello Mountain' and a dark-mode toggle."
 
@@ -154,7 +167,75 @@ OPENAI_API_KEY=...
 TELEGRAM_BOT_TOKEN=...
 TELEGRAM_ADMIN_CHAT_ID=...
 HOOKDECK_SECRET=...
+VONAGE_API_KEY=...
+VONAGE_API_SECRET=...
+VONAGE_WHATSAPP_TO=...
 ```
+
+---
+
+## 🛠️ Development Commands
+
+### Main Commands
+
+```bash
+# Start everything (server + both tunnels)
+make dev
+
+# Start server only
+make server
+
+# Start both Hookdeck tunnels
+make tunnels
+
+# View server logs
+make logs
+
+# Stop everything
+make clean
+```
+
+### Tunnel Management
+
+```bash
+# Start Telegram tunnel only
+make tunnel-telegram
+
+# Start Vonage/WhatsApp tunnel only
+make tunnel-vonage
+
+# Stop all tunnels
+make kill-tunnels
+
+# Stop server only
+make kill-server
+
+# Stop everything (server + tunnels)
+make kill-all
+```
+
+### What's Running?
+
+When you run `make dev`, it starts:
+1. **Server** on `http://localhost:3020`
+   - `/telegram` - Telegram webhook endpoint
+   - `/vonage` - Vonage WhatsApp webhook endpoint
+   - `/health` - Health check endpoint
+
+2. **Telegram Tunnel** - Hookdeck tunnel for Telegram webhooks
+   - Forwards `https://hkdk.events/...` → `http://localhost:3020/telegram`
+
+3. **Vonage Tunnel** - Hookdeck tunnel for WhatsApp webhooks
+   - Forwards `https://hkdk.events/...` → `http://localhost:3020/vonage`
+
+### Logs
+
+All logs are saved to:
+- `server.log` - Server logs
+- `telegram-tunnel.log` - Telegram tunnel logs
+- `vonage-tunnel.log` - Vonage tunnel logs
+
+Use `make logs` to tail the server logs in real-time.
 
 ---
 

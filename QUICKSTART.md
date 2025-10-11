@@ -31,7 +31,7 @@ Edit `.env` and add your credentials:
 ```env
 OPENAI_API_KEY=sk-your-openai-key
 TELEGRAM_BOT_TOKEN=123456789:ABC-your-bot-token
-HOOKDECK_URL=https://hkdk.events/your-endpoint
+HOOKDECK_TELEGRAM_URL=https://hkdk.events/your-endpoint
 ```
 
 ### Getting API Keys
@@ -123,7 +123,7 @@ voice2app/
 - Try restarting the bot with a new token
 
 ### "Webhook setup failed"
-- Check your `HOOKDECK_URL` is correct
+- Check your `HOOKDECK_TELEGRAM_URL` is correct
 - Make sure Hookdeck destination points to `http://localhost:3020/telegram`
 - If using production, use your server's public URL instead of localhost
 
