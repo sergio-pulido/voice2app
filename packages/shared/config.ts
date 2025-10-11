@@ -1,0 +1,69 @@
+/**
+ * Shared configuration
+ */
+
+import type { STTProvider, LLMProvider, TTSProvider } from './providers'
+
+export const config = {
+  // API Keys
+  openaiApiKey: process.env.OPENAI_API_KEY || '',
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
+  groqApiKey: process.env.GROQ_API_KEY || '',
+  elevenlabsApiKey: process.env.ELEVENLABS_API_KEY || '',
+  
+  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',
+  telegramAdminChatId: process.env.TELEGRAM_ADMIN_CHAT_ID || '',
+  hookdeckSecret: process.env.HOOKDECK_SECRET || '',
+  telegramWebhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET || '',
+  hookdeckUrl: process.env.HOOKDECK_URL || '',
+  
+  // Provider Selection
+  sttProvider: (process.env.STT_PROVIDER || 'openai') as STTProvider,
+  llmProvider: (process.env.LLM_PROVIDER || 'openai') as LLMProvider,
+  ttsProvider: (process.env.TTS_PROVIDER || 'openai') as TTSProvider,
+  
+  // Ports
+  gatewayPort: parseInt(process.env.PORT_GATEWAY || '3020'),
+  
+  // Paths
+  sandboxRoot: './sandbox',
+  artifactsRoot: './artifacts',
+  
+  // Model Settings
+  llmModel: process.env.LLM_MODEL || 'gpt-4o-mini',
+  llmTemperature: parseFloat(process.env.LLM_TEMPERATURE || '0.7'),
+  
+  // Runner Settings
+  runnerTimeout: parseInt(process.env.RUNNER_TIMEOUT || '30000'), // 30s
+  screenshotDelay: parseInt(process.env.SCREENSHOT_DELAY || '2000'), // 2s
+} as const
+
+export function validateConfig(): boolean {
+  // Check that we have at least one valid provider configured
+  const sttValid = 
+    (config.sttProvider === 'openai' && config.openaiApiKey) ||
+    (config.sttProvider === 'elevenlabs' && config.elevenlabsApiKey)
+  
+  const llmValid =
+    (config.llmProvider === 'openai' && config.openaiApiKey) ||
+    (config.llmProvider === 'anthropic' && config.anthropicApiKey) ||
+    (config.llmProvider === 'groq' && config.groqApiKey)
+  
+  if (!config.telegramBotToken) {
+    console.error('❌ Missing required: TELEGRAM_BOT_TOKEN')
+    return false
+  }
+  
+  if (!sttValid) {
+    console.error(`❌ Missing API key for STT provider: ${config.sttProvider}`)
+    return false
+  }
+  
+  if (!llmValid) {
+    console.error(`❌ Missing API key for LLM provider: ${config.llmProvider}`)
+    return false
+  }
+  
+  return true
+}
+

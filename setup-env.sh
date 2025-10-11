@@ -15,9 +15,6 @@ TELEGRAM_WEBHOOK_SECRET=your_webhook_secret_here
 # Hookdeck Configuration  
 HOOKDECK_URL=https://hkdk.events/k6dddf8z54fd7q
 
-# Lovable API Configuration
-LOVABLE_API_KEY=your_lovable_api_key_here
-
 # Server Configuration
 PORT_GATEWAY=3020
 NODE_ENV=development

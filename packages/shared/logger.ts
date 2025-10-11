@@ -1,0 +1,32 @@
+/**
+ * Shared logger utility
+ */
+
+export const logger = {
+  info: (message: string, ...args: any[]) => {
+    console.log(`ℹ️  ${message}`, ...args)
+  },
+  
+  success: (message: string, ...args: any[]) => {
+    console.log(`✅ ${message}`, ...args)
+  },
+  
+  error: (message: string, ...args: any[]) => {
+    console.error(`❌ ${message}`, ...args)
+  },
+  
+  warn: (message: string, ...args: any[]) => {
+    console.warn(`⚠️  ${message}`, ...args)
+  },
+  
+  debug: (message: string, ...args: any[]) => {
+    if (process.env.DEBUG) {
+      console.log(`🔍 ${message}`, ...args)
+    }
+  },
+  
+  job: (jobId: string, message: string, ...args: any[]) => {
+    console.log(`🔧 [${jobId}] ${message}`, ...args)
+  },
+}
+

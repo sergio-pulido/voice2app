@@ -1,18 +1,21 @@
 {
   "name": "voice2app",
   "version": "1.0.0",
-  "module": "index.ts",
+  "module": "server.ts",
   "type": "module",
   "scripts": {
     "dev": "bun run --watch server.ts",
     "start": "bun run server.ts",
-    "test-webhook": "bun run test-webhook.ts"
+    "test-webhook": "bun run test-webhook.ts",
+    "test-setup": "bun run scripts/test-setup.ts"
   },
   "dependencies": {
-    "hono": "^4.0.0"
+    "hono": "^4.0.0",
+    "playwright": "^1.40.0"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/node": "^20.10.0"
   }
 }
 

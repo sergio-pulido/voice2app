@@ -140,3 +140,9 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Voice2App specific
+sandbox/
+artifacts/
+!sandbox/.gitkeep
+!artifacts/.gitkeep

@@ -85,41 +85,64 @@ Artifacts and logs are stored under `artifacts/`
 
 ```bash
 git clone <repo>
-cd voice-to-app
+cd voice2app
 bun install
-bun run packages/telegram-gateway/index.ts
+bunx playwright install chromium
+cp .env.example .env
+# Edit .env with your credentials
+bun run dev
 ```
 
 Then:
-1. In **Hookdeck**, create a Source (Webhook) and Destination (`http://localhost:3001/telegram`).
-2. Set your **Telegram webhook** to the Hookdeck URL:
-   ```bash
-   curl "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook"      --data-urlencode "url=https://hookdeck.com/e/your-endpoint"      --data "drop_pending_updates=true"
-   ```
+1. In **Hookdeck**, create a Source (Webhook) and Destination (`http://localhost:3020/telegram`)
+2. Add your `HOOKDECK_URL` to `.env` - the server will auto-configure the webhook
 3. Send a voice or text message to your bot:
-   > “Create a landing page with a big title ‘Hello Mountain’ and a dark-mode toggle.”
+   > 🎤 "Create a landing page with a big title 'Hello Mountain' and a dark-mode toggle."
 
-Within seconds you’ll receive:
-- a **screenshot** of the generated app,
-- a **short summary** of build results,
-- (optional) **voice reply** synthesized from the summary.
+Within seconds you'll receive:
+- a **screenshot** of the generated app
+- a **short summary** of build results
+- **suggestions** for next steps
+
+📖 **See [QUICKSTART.md](./QUICKSTART.md) for detailed setup instructions!**
 
 ---
 
 ## 🧩 Folder Structure
 
 ```
-voice-to-app/
+voice2app/
   packages/
-    telegram-gateway/   # receives Telegram events, runs orchestrator
-    planner/            # STT + natural-language to JSON task
-    codegen/            # LLM-based code writer
-    runner/             # builds, runs, screenshots
-    analyzer/           # summarizes results
-    notifier/           # sends replies to Telegram
-  sandbox/              # generated temporary apps
-  artifacts/            # screenshots, logs
-  .env
+    telegram-gateway/        # receives Telegram events, runs orchestrator
+      ├── index.ts          # Hono app with webhook endpoint
+      ├── orchestrator.ts   # main pipeline coordinator
+      └── telegram-client.ts # Telegram API utilities
+    planner/                 # STT + natural-language to JSON task
+      ├── index.ts          # main entry point
+      ├── stt.ts            # Whisper speech-to-text
+      └── task-planner.ts   # natural language → task
+    codegen/                 # LLM-based code writer
+      ├── index.ts          # main entry point
+      ├── generator.ts      # GPT code generation
+      └── file-writer.ts    # writes files to sandbox
+    runner/                  # builds, runs, screenshots
+      ├── index.ts          # main entry point
+      ├── builder.ts        # bun install & build
+      ├── server.ts         # dev server
+      └── screenshot.ts     # Playwright capture
+    analyzer/                # summarizes results
+      └── index.ts          # GPT-powered analysis
+    notifier/                # sends replies to Telegram
+      └── index.ts          # send messages & photos
+    shared/                  # common utilities
+      ├── types.ts          # TypeScript interfaces
+      ├── config.ts         # environment config
+      ├── logger.ts         # logging utilities
+      └── index.ts          # exports
+  sandbox/                   # generated temporary apps
+  artifacts/                 # screenshots, logs
+  server.ts                  # main entry point
+  .env                       # your credentials
 ```
 
 ---
