@@ -88,6 +88,7 @@ app.all('/vonage', async (c) => {
 
 async function processMessage(chatId: number, message: any) {
   const messageId = message.message_id
+  const username = message.from?.first_name || message.from?.username || 'Unknown'
   
   try {
     // Handle voice messages
@@ -111,6 +112,7 @@ async function processMessage(chatId: number, message: any) {
         chatId,
         messageId,
         voiceBuffer,
+        username,
       })
     }
     // Handle text messages
@@ -122,6 +124,7 @@ async function processMessage(chatId: number, message: any) {
         chatId,
         messageId,
         textMessage: message.text,
+        username,
       })
     }
     // Handle unsupported types
