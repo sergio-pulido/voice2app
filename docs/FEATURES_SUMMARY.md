@@ -254,7 +254,7 @@ make logs             # View logs
 
 ### Where to Find It
 
-- **Server Logs**: `server.log` or `make logs`
+- **Server Logs**: `logs/server.log` or `make logs`
 - **WhatsApp**: Real-time admin notifications
 - **Hookdeck Dashboard**: https://dashboard.hookdeck.com/
 

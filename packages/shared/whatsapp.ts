@@ -51,6 +51,14 @@ export async function sendWhatsAppMessage(message: WhatsAppMessage): Promise<Von
 
     if (!response.ok) {
       const errorText = await response.text()
+      
+      // Handle rate limiting (429) gracefully
+      if (response.status === 429) {
+        logger.warn(`⚠️  WhatsApp rate limit reached (Vonage 429). Message not sent.`)
+        logger.warn(`   This is normal with Vonage sandbox. Rate limit will reset soon.`)
+        return null
+      }
+      
       logger.error(`Vonage API error: ${response.status} - ${errorText}`)
       return null
     }

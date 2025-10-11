@@ -1,8 +1,8 @@
 /**
- * Q&A Adapter: Handles question answering
+ * Q&A Adapter: Handles question answering with LLM
  */
 
-import { logger } from '../../shared'
+import { logger, config } from '../../shared'
 import type { Adapter, AdapterInput, AdapterOutput } from '../types'
 
 export class QAAdapter implements Adapter {
@@ -12,24 +12,21 @@ export class QAAdapter implements Adapter {
     const startTime = Date.now()
     
     try {
-      // TODO: Integrate with Linkup for factual queries
-      // For now, use a simple LLM response
-      
       const question = input.transcription || input.text
       
-      // Simulate Q&A processing
-      // In production, this would call an LLM or search API
-      const answer = await this.answerQuestion(question)
+      // Use LLM to answer the question
+      const answer = await this.answerWithLLM(question)
       
       const processingTime = Date.now() - startTime
       
       return {
         summaryText: answer,
-        ttsText: answer.substring(0, 300), // Shorter for voice
+        ttsText: answer.substring(0, 400), // Shorter for voice
         metadata: {
           category: 'qa',
           processingTime,
-          status: 'success'
+          status: 'success',
+          transcription: input.transcription
         }
       }
     } catch (error) {
@@ -46,27 +43,57 @@ export class QAAdapter implements Adapter {
     }
   }
   
-  private async answerQuestion(question: string): Promise<string> {
-    // Simple pattern matching for demo
-    // TODO: Replace with actual LLM/search integration
+  private async answerWithLLM(question: string): Promise<string> {
+    logger.debug(`Answering question with LLM: "${question}"`)
     
-    const lowerQ = question.toLowerCase()
+    // Use Groq for fast Q&A
+    const apiKey = config.groqApiKey || config.openaiApiKey
+    const isGroq = !!config.groqApiKey
     
-    if (lowerQ.includes('capital') && lowerQ.includes('spain')) {
-      return '🌍 The capital of Spain is **Madrid**. It\'s located in the center of the country and is the largest city in Spain with a population of over 3 million people.'
+    if (!apiKey) {
+      throw new Error('No LLM API key configured (GROQ_API_KEY or OPENAI_API_KEY)')
     }
     
-    if (lowerQ.includes('capital') && lowerQ.includes('france')) {
-      return '🇫🇷 The capital of France is **Paris**. Known as the "City of Light," it\'s famous for the Eiffel Tower, the Louvre, and its rich history.'
+    const url = isGroq 
+      ? 'https://api.groq.com/openai/v1/chat/completions'
+      : 'https://api.openai.com/v1/chat/completions'
+    
+    const model = isGroq ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini'
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a helpful assistant that answers questions concisely and accurately. Provide clear, informative answers in 2-3 sentences. Use emojis when appropriate.'
+          },
+          {
+            role: 'user',
+            content: question
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 300
+      })
+    })
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`LLM API error: ${response.status} - ${errorText}`)
     }
     
-    // Generic response
-    return `💬 **Question**: ${question}\n\n` +
-           `I'm currently set up primarily for app building. For comprehensive Q&A, I'll need to integrate with additional AI services.\n\n` +
-           `💡 **Tip**: Try asking me to build something instead! For example:\n` +
-           `• "Create a counter app"\n` +
-           `• "Build a landing page"\n` +
-           `• "Make a todo list"`
+    const data = await response.json()
+    const answer = data.choices[0]?.message?.content || 'No answer generated'
+    
+    logger.success('Answer generated')
+    
+    return answer
   }
 }
 

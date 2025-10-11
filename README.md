@@ -155,16 +155,32 @@ The system now intelligently routes requests to different tools:
 - Comprehensive results with AI analysis
 - Screenshot previews of generated apps
 
-#### **WhatsApp (Admin Monitoring)**
-- Real-time activity notifications
-- Detailed metrics per request:
-  - User information (name, ID)
-  - Processing time
-  - Status (success/partial/error)
-  - Files generated count
-  - Project type and intent
-  - Transcriptions (for voice)
-  - Error details with stack traces
+#### **Admin Monitoring (Discord or WhatsApp)**
+
+**💎 Discord (Recommended - Free!)**
+- ✅ Unlimited notifications (no rate limits)
+- ✅ Rich embeds with colors and formatting
+- ✅ Team collaboration (multiple admins)
+- ✅ Message history and search
+- ✅ Zero cost
+- Easy setup via webhook (5 minutes)
+
+**WhatsApp (Optional)**
+- Real-time notifications on mobile
+- Personal WhatsApp messages
+- ⚠️ Has rate limits (Vonage sandbox)
+- ⚠️ Costs money after free tier
+- Use only if you need mobile push notifications
+
+**Admin notifications include**:
+- User information (name, ID)
+- Tool used (Q&A, App Builder, etc.)
+- Processing time
+- Status (success/partial/error)
+- Files generated count
+- Project type and intent
+- Transcriptions (for voice)
+- Error details with stack traces
 
 ### 🔌 Hookdeck CLI Integration
 - **Dual Tunnels**: Separate tunnels for Telegram and WhatsApp
@@ -283,7 +299,7 @@ This will:
 
 2. **Vonage WhatsApp**:
    - Go to: https://dashboard.nexmo.com/messages/sandbox
-   - Set **Inbound URL**: `https://hkdk.events/...` (from vonage-tunnel.log)
+   - Set **Inbound URL**: `https://hkdk.events/...` (from logs/vonage-tunnel.log)
    - Set **Status URL**: Same URL as above
 
 ### Usage
@@ -394,10 +410,14 @@ ANTHROPIC_API_KEY=your_anthropic_api_key    # Alternative
 ELEVENLABS_API_KEY=your_elevenlabs_api_key  # Recommended (scribe_v1)
 # OR use OPENAI_API_KEY for Whisper
 
-# WhatsApp Admin Monitoring
+# Admin Notifications (choose one or both)
+ENABLE_DISCORD_ADMIN=true                    # Recommended (free, unlimited)
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
+
+ENABLE_WHATSAPP_ADMIN=false                  # Optional (has costs & limits)
 VONAGE_API_KEY=your_vonage_api_key
 VONAGE_API_SECRET=your_vonage_api_secret
-VONAGE_WHATSAPP_TO=34622035636              # Your admin WhatsApp number
+VONAGE_WHATSAPP_TO=34622035636
 ```
 
 ### Optional
@@ -412,6 +432,17 @@ VONAGE_WHATSAPP_FROM=14157386102
 # Provider Selection
 STT_PROVIDER=elevenlabs                      # or 'openai'
 LLM_PROVIDER=groq                           # or 'openai', 'anthropic'
+```
+
+### 💡 Recommended Configuration
+
+For production, we recommend:
+- ✅ **Discord for admin notifications** (free, unlimited, team collaboration)
+- ⚠️ **WhatsApp disabled** (avoid rate limits and costs)
+
+```env
+ENABLE_DISCORD_ADMIN=true
+ENABLE_WHATSAPP_ADMIN=false
 ```
 
 ### Provider Configuration
@@ -477,9 +508,9 @@ When you run `make dev`, it starts:
 ### Logs
 
 All logs are saved to:
-- `server.log` - Server logs
-- `telegram-tunnel.log` - Telegram tunnel logs
-- `vonage-tunnel.log` - Vonage tunnel logs
+- `logs/server.log` - Server logs
+- `logs/telegram-tunnel.log` - Telegram tunnel logs
+- `logs/vonage-tunnel.log` - Vonage tunnel logs
 
 Use `make logs` to tail the server logs in real-time.
 
@@ -658,11 +689,11 @@ make dev
 
 2. **Verify Hookdeck URLs**:
    ```bash
-   cat telegram-tunnel.log | grep "https://hkdk.events"
-   cat vonage-tunnel.log | grep "https://hkdk.events"
+   cat logs/telegram-tunnel.log | grep "https://hkdk.events"
+   cat logs/vonage-tunnel.log | grep "https://hkdk.events"
    ```
 
-3. **Update Vonage dashboard** with the new URL from `vonage-tunnel.log`
+3. **Update Vonage dashboard** with the new URL from `logs/vonage-tunnel.log`
 
 ### Voice Messages Not Transcribing
 
@@ -697,6 +728,7 @@ make dev
 ## 📖 Additional Documentation
 
 - **[QUICKSTART.md](./QUICKSTART.md)** - Detailed setup instructions
+- **[docs/DISCORD_ADMIN.md](./docs/DISCORD_ADMIN.md)** - Discord admin setup (recommended!)
 - **[docs/ADMIN_NOTIFICATIONS.md](./docs/ADMIN_NOTIFICATIONS.md)** - WhatsApp admin guide
 - **[docs/AI_ROUTER.md](./docs/AI_ROUTER.md)** - AI Router and multi-tool system
 - **[docs/PROVIDERS.md](./docs/PROVIDERS.md)** - AI provider configuration

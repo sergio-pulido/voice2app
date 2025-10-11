@@ -24,7 +24,7 @@ dev:
 	@echo ""
 	@echo "1️⃣ Starting server..."
 	@make kill-server 2>/dev/null || true
-	@bun run server.ts > server.log 2>&1 &
+	@bun run server.ts > logs/server.log 2>&1 &
 	@echo "   ✅ Server started on http://localhost:3020"
 	@sleep 2
 	@echo ""
@@ -52,17 +52,17 @@ tunnels:
 	@sleep 1
 	@echo ""
 	@echo "   🔌 Starting Telegram tunnel..."
-	@hookdeck listen 3020 telegram-bot --path /telegram > telegram-tunnel.log 2>&1 &
+	@hookdeck listen 3020 telegram-bot --path /telegram > logs/telegram-tunnel.log 2>&1 &
 	@sleep 2
 	@echo "   ✅ Telegram tunnel started"
 	@echo ""
 	@echo "   🔌 Starting Vonage tunnel..."
-	@hookdeck listen 3020 vonage-whatsapp --path /vonage > vonage-tunnel.log 2>&1 &
+	@hookdeck listen 3020 vonage-whatsapp --path /vonage > logs/vonage-tunnel.log 2>&1 &
 	@sleep 2
 	@echo "   ✅ Vonage tunnel started"
 	@echo ""
 	@echo "📡 Hookdeck URLs:"
-	@grep -h "URL:" telegram-tunnel.log vonage-tunnel.log 2>/dev/null || echo "   ⚠️  URLs not yet available, check log files"
+	@grep -h "URL:" logs/telegram-tunnel.log logs/vonage-tunnel.log 2>/dev/null || echo "   ⚠️  URLs not yet available, check log files"
 	@echo "   • Dashboard: https://dashboard.hookdeck.com/"
 	@echo ""
 
@@ -87,7 +87,7 @@ setup-webhook:
 logs:
 	@echo "📋 Server logs (Ctrl+C to exit):"
 	@echo ""
-	@tail -f server.log
+	@tail -f logs/server.log
 
 # Kill server only
 kill-server:
@@ -111,7 +111,7 @@ kill-all: kill-server kill-tunnels
 # Clean up everything
 clean: kill-all
 	@echo "🧹 Cleaning up..."
-	@rm -f server.log telegram-tunnel.log vonage-tunnel.log
+	@rm -f logs/server.log logs/telegram-tunnel.log logs/vonage-tunnel.log
 	@echo "   ✅ Log files removed"
 	@echo ""
 	@echo "✨ Clean complete!"

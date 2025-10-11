@@ -34,7 +34,7 @@
 
 **New Files**:
 - `Makefile` - All development commands
-- `telegram-tunnel.log`, `vonage-tunnel.log`, `server.log` - Log files
+- `logs/telegram-tunnel.log`, `logs/vonage-tunnel.log`, `logs/server.log` - Log files
 
 #### 🤖 Enhanced Provider Support
 - **Multi-Provider STT**: ElevenLabs (scribe_v1) + OpenAI Whisper

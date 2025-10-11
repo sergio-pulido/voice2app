@@ -24,6 +24,13 @@ export const config = {
   vonageWhatsAppFrom: process.env.VONAGE_WHATSAPP_FROM || '14157386102', // Default sandbox number
   vonageWhatsAppTo: process.env.VONAGE_WHATSAPP_TO || '',
   
+  // Admin Notifications
+  enableWhatsAppAdmin: process.env.ENABLE_WHATSAPP_ADMIN === 'true',
+  enableDiscordAdmin: process.env.ENABLE_DISCORD_ADMIN === 'true',
+  
+  // Discord Admin
+  discordWebhookUrl: process.env.DISCORD_WEBHOOK_URL || '',
+  
   // Provider Selection
   sttProvider: (process.env.STT_PROVIDER || 'openai') as STTProvider,
   llmProvider: (process.env.LLM_PROVIDER || 'openai') as LLMProvider,

@@ -4,6 +4,7 @@
 
 import { logger, config } from '../shared'
 import { sendWhatsAppMessage } from '../shared/whatsapp'
+import { sendDiscordAdminNotification, createAdminEmbed } from '../shared/discord-admin'
 import { sendNotification, sendAcknowledgment, sendError } from '../notifier'
 import { routeRequest, getCategoryName, getCategoryEmoji, type IntentCategory } from '../router'
 
@@ -16,14 +17,29 @@ interface OrchestrateOptions {
 }
 
 /**
- * Send detailed admin notification to WhatsApp
+ * Send admin notification to configured channels (WhatsApp and/or Discord)
  */
-async function sendAdminNotification(message: string): Promise<void> {
-  if (config.vonageWhatsAppTo) {
+async function sendAdminNotification(message: string, embed?: any): Promise<void> {
+  // Send to WhatsApp if enabled
+  if (config.enableWhatsAppAdmin && config.vonageWhatsAppTo) {
     await sendWhatsAppMessage({
       to: config.vonageWhatsAppTo,
       text: message
     })
+  }
+  
+  // Send to Discord if enabled
+  if (config.enableDiscordAdmin && config.discordWebhookUrl) {
+    if (embed) {
+      await sendDiscordAdminNotification(embed)
+    } else {
+      await sendDiscordAdminNotification(message)
+    }
+  }
+  
+  // If neither is enabled, just log
+  if (!config.enableWhatsAppAdmin && !config.enableDiscordAdmin) {
+    logger.debug('Admin notifications disabled. Message:', message)
   }
 }
 
@@ -84,7 +100,7 @@ export async function orchestrate(options: OrchestrateOptions): Promise<void> {
     const status = result.metadata?.status || 'success'
     const statusEmoji = status === 'success' ? '✅' : status === 'partial' ? '⚠️' : '❌'
     
-    await sendAdminNotification(
+    const adminMessage = 
       `${statusEmoji} REQUEST COMPLETED\n` +
       `👤 User: ${username || 'Unknown'} (${chatId})\n` +
       `🎯 Tool: ${categoryName}\n` +
@@ -96,7 +112,25 @@ export async function orchestrate(options: OrchestrateOptions): Promise<void> {
       (result.metadata?.intent ? `🔧 Intent: ${result.metadata.intent}\n` : '') +
       (result.metadata?.transcription ? `🎤 Transcription: "${result.metadata.transcription}"\n` : '') +
       `\n📝 Summary:\n${result.summaryText.substring(0, 200)}${result.summaryText.length > 200 ? '...' : ''}`
-    )
+    
+    // Create rich Discord embed if Discord is enabled
+    const discordEmbed = config.enableDiscordAdmin ? createAdminEmbed({
+      title: `${statusEmoji} Request Completed`,
+      description: `Tool: ${categoryName}`,
+      fields: [
+        { name: '👤 User', value: `${username || 'Unknown'} (${chatId})`, inline: true },
+        { name: '⏱️ Time', value: `${processingTime}s`, inline: true },
+        { name: '📊 Status', value: status.toUpperCase(), inline: true },
+        { name: '🎯 Tool', value: categoryName, inline: false },
+        { name: '📋 Task', value: inputPreview.substring(0, 100), inline: false },
+        ...(result.metadata?.filesGenerated ? [{ name: '📦 Files', value: `${result.metadata.filesGenerated} generated`, inline: true }] : []),
+        ...(result.metadata?.transcription ? [{ name: '🎤 Transcription', value: result.metadata.transcription.substring(0, 100), inline: false }] : [])
+      ],
+      color: status === 'success' ? 'success' : status === 'partial' ? 'warning' : 'error',
+      status: status.toUpperCase()
+    }) : undefined
+    
+    await sendAdminNotification(adminMessage, discordEmbed)
     
     logger.success('🎉 Orchestration complete!')
   } catch (error) {

@@ -24,13 +24,26 @@ interface RouterInput {
 function fastClassify(text: string): IntentResult | null {
   const lowerText = text.toLowerCase()
   
+  // Check for explanation/Q&A patterns FIRST (to avoid false positives)
+  const qaSpecificPatterns = [
+    'what is', 'qué es', 'cual es', 'which is',
+    'explain', 'explica', 'what does', 'qué significa',
+    'how does', 'cómo funciona', 'tell me about', 'dime sobre'
+  ]
+  
+  for (const pattern of qaSpecificPatterns) {
+    if (lowerText.includes(pattern)) {
+      return { category: 'qa', confidence: 0.9 }
+    }
+  }
+  
   // App/Code generation keywords
   const appKeywords = [
     'create app', 'build app', 'make app', 'genera app',
     'create page', 'build page', 'make page', 'genera página',
     'create website', 'build website', 'make website',
     'todo app', 'counter app', 'landing page',
-    'react', 'component', 'frontend', 'backend',
+    'create component', 'build component', 'make component',
     'crea una app', 'haz una app', 'construye',
     'hacer una página', 'crear página'
   ]
