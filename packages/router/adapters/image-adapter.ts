@@ -61,13 +61,32 @@ export class ImageAdapter implements Adapter {
       // Generate image with selected provider
       let imagePath: string | null
       let modelName: string
+      let modelId: string
       
       if (provider === 'gemini') {
         imagePath = await generateImageWithGeminiRetry(prompt)
-        modelName = 'Google Gemini (Nano Banana / Imagen 3)'
+        modelName = 'Google Gemini (Imagen 3)'
+        modelId = 'imagen-3.0'
       } else {
         imagePath = await generateImageWithRetry(prompt)
-        modelName = 'Stable Diffusion XL'
+        // Get model name from config and make it display-friendly
+        const fullModelId = config.imageModel
+        modelId = fullModelId
+        
+        // Extract friendly name from model ID
+        if (fullModelId.includes('playground-v2.5')) {
+          modelName = 'Playground v2.5'
+        } else if (fullModelId.includes('flux')) {
+          modelName = 'Flux.1'
+        } else if (fullModelId.includes('sd3') || fullModelId.includes('stable-diffusion-3')) {
+          modelName = 'Stable Diffusion 3'
+        } else if (fullModelId.includes('sdxl') || fullModelId.includes('stable-diffusion-xl')) {
+          modelName = 'Stable Diffusion XL'
+        } else {
+          // Fallback: extract last part of model ID
+          const parts = fullModelId.split('/')
+          modelName = parts[parts.length - 1].replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+        }
       }
       
       if (!imagePath) {
@@ -104,7 +123,7 @@ export class ImageAdapter implements Adapter {
           status: 'success',
           prompt,
           provider,
-          model: provider === 'gemini' ? 'imagen-3.0' : 'stable-diffusion-xl-base-1.0'
+          model: modelId
         }
       }
     } catch (error) {

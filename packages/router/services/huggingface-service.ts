@@ -34,16 +34,16 @@ export async function generateImage(prompt: string): Promise<string> {
     
     const client = getClient()
     
-    // Use Stable Diffusion XL for high-quality images (now that you have correct permissions)
-    const model = 'stabilityai/stable-diffusion-xl-base-1.0'
+    // Use configurable model from environment (defaults to Playground v2.5 for better quality)
+    const model = config.imageModel
     
-    logger.debug(`Using model: ${model}`)
+    logger.info(`Using HuggingFace model: ${model}`)
     
     const response = await client.textToImage({
       model,
       inputs: prompt,
       parameters: {
-        negative_prompt: 'blurry, bad quality, distorted, ugly',
+        negative_prompt: 'blurry, bad quality, distorted, ugly, watermark, text',
         num_inference_steps: 30,
         guidance_scale: 7.5
       }

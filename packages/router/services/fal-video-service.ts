@@ -4,9 +4,10 @@
  * https://fal.ai/models/veed/fabric-1.0
  */
 
+import * as fal from '@fal-ai/client'
 import { config } from '../../shared/config'
 import { logger } from '../../shared/logger'
-import { writeFile, mkdir } from 'fs/promises'
+import { writeFile, mkdir, readFile } from 'fs/promises'
 import { join } from 'path'
 
 interface FabricVideoOptions {
@@ -40,38 +41,59 @@ export async function generateVideoWithFabric(options: FabricVideoOptions): Prom
       throw new Error('FAL_API_KEY not configured')
     }
     
-    const endpoint = 'https://fal.run/fal-ai/veed/fabric-1.0'
-    
-    logger.debug('Calling fal.ai Fabric 1.0 API...')
-    
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Key ${config.falApiKey}`
-      },
-      body: JSON.stringify({
-        image_url: imageUrl,
-        audio_url: audioUrl,
-        resolution: resolution
-      })
+    // Configure fal.ai client
+    fal.config({
+      credentials: config.falApiKey
     })
     
-    if (!response.ok) {
-      const errorText = await response.text()
-      logger.error('fal.ai API error response:', errorText)
-      throw new Error(`fal.ai API error (${response.status}): ${errorText}`)
+    logger.debug('Submitting to fal.ai Fabric 1.0...')
+    
+    // For local files, we need to upload them first
+    let imageUrlToUse = imageUrl
+    let audioUrlToUse = audioUrl
+    
+    // If paths are local files, read and convert to data URLs
+    if (!imageUrl.startsWith('http')) {
+      logger.debug('Reading local image file...')
+      const imageBuffer = await readFile(imageUrl)
+      const base64Image = imageBuffer.toString('base64')
+      const mimeType = imageUrl.endsWith('.png') ? 'image/png' : 'image/jpeg'
+      imageUrlToUse = `data:${mimeType};base64,${base64Image}`
     }
     
-    const data: FabricVideoResponse = await response.json()
+    if (!audioUrl.startsWith('http')) {
+      logger.debug('Reading local audio file...')
+      const audioBuffer = await readFile(audioUrl)
+      const base64Audio = audioBuffer.toString('base64')
+      const mimeType = audioUrl.endsWith('.mp3') ? 'audio/mp3' : 
+                       audioUrl.endsWith('.wav') ? 'audio/wav' : 'audio/ogg'
+      audioUrlToUse = `data:${mimeType};base64,${base64Audio}`
+    }
+    
+    // Submit the job to fal.ai
+    const result = await fal.subscribe('veed/fabric-1.0', {
+      input: {
+        image_url: imageUrlToUse,
+        audio_url: audioUrlToUse,
+        resolution: resolution
+      },
+      logs: true,
+      onQueueUpdate: (update) => {
+        if (update.status === 'IN_PROGRESS') {
+          logger.info(`📹 Video generation in progress...`)
+        }
+      }
+    })
+    
+    logger.debug('fal.ai response:', JSON.stringify(result, null, 2))
     
     // Extract video URL from response
-    if (!data.video?.url) {
-      logger.error('Unexpected fal.ai response format:', JSON.stringify(data, null, 2))
+    if (!result.data?.video?.url) {
+      logger.error('Unexpected fal.ai response format:', JSON.stringify(result, null, 2))
       throw new Error('Invalid response format from fal.ai API')
     }
     
-    const videoUrl = data.video.url
+    const videoUrl = result.data.video.url
     logger.info(`📹 Video generated, downloading from: ${videoUrl}`)
     
     // Download the video

@@ -393,7 +393,7 @@ export async function detectIntent(input: RouterInput): Promise<IntentResult> {
 export function getCategoryName(category: IntentCategory): string {
   const names: Record<IntentCategory, string> = {
     'help': '❓ Help',
-    'friend': '👋 Friendly Chat',
+    'friend': '🤖 Barna Hacker',
     'qa': '💬 Q&A',
     'app_code': '💻 App Builder',
     'image_gen': '🎨 Image Generator',
@@ -409,7 +409,7 @@ export function getCategoryName(category: IntentCategory): string {
 export function getCategoryEmoji(category: IntentCategory): string {
   const emojis: Record<IntentCategory, string> = {
     'help': '❓',
-    'friend': '👋',
+    'friend': '🤖',
     'qa': '💬',
     'app_code': '💻',
     'image_gen': '🎨',

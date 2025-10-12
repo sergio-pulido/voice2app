@@ -1,5 +1,5 @@
 /**
- * Test script for the Friend Adapter
+ * Test script for the Barna Hacker Adapter
  * 
  * Usage: bun run scripts/test-friend-adapter.ts
  */
@@ -7,22 +7,22 @@
 import { routeRequest } from '../packages/router'
 import { logger } from '../packages/shared'
 
-// Test cases for the friend adapter
+// Test cases for the Barna Hacker adapter
 const testCases = [
-  { text: 'Hello!', description: 'Simple greeting' },
-  { text: 'How are you?', description: 'Asking how the bot is' },
-  { text: 'How are you feeling today?', description: 'More personal question' },
-  { text: 'Tell me a joke', description: 'Request for entertainment' },
-  { text: 'What\'s up?', description: 'Casual greeting' },
-  { text: 'Good morning!', description: 'Time-specific greeting' },
-  { text: 'Thanks for your help!', description: 'Gratitude expression' },
-  { text: 'You\'re pretty cool', description: 'Compliment' },
-  { text: 'I\'m feeling a bit tired today', description: 'Sharing feelings' },
-  { text: 'Hola, cómo estás?', description: 'Spanish greeting' }
+  { text: 'Ey! What\'s up tio?', description: 'Barcelona style greeting' },
+  { text: 'How are you? What are you coding today?', description: 'Asking about current projects' },
+  { text: 'What\'s your favorite programming language?', description: 'Tech preferences question' },
+  { text: 'Tell me a programming joke', description: 'Request for geeky humor' },
+  { text: 'What games are you playing?', description: 'Gaming question' },
+  { text: 'Have you watched the latest Black Mirror episode?', description: 'Series talk' },
+  { text: 'My code is broken, everything crashes!', description: 'Tech frustration' },
+  { text: 'Just deployed to production on a Friday 😱', description: 'Sharing risky dev moment' },
+  { text: 'What\'s the BCN tech scene like?', description: 'Barcelona tech culture' },
+  { text: 'Hola! Qué opinas de la nueva IA de OpenAI?', description: 'Spanish tech question' }
 ]
 
-async function testFriendAdapter() {
-  logger.info('🧪 Testing Friend Adapter...\n')
+async function testBarnaHacker() {
+  logger.info('🧪 Testing Barna Hacker Adapter...\n')
   
   for (const testCase of testCases) {
     logger.info(`\n${'='.repeat(60)}`)
@@ -59,7 +59,7 @@ async function testFriendAdapter() {
 }
 
 // Run tests
-testFriendAdapter().catch(error => {
+testBarnaHacker().catch(error => {
   logger.error('Test suite failed:', error)
   process.exit(1)
 })

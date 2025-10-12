@@ -13,6 +13,7 @@
     "test:whatsapp": "bun run scripts/test-whatsapp.ts"
   },
   "dependencies": {
+    "@fal-ai/client": "^1.6.2",
     "@huggingface/inference": "^4.11.1",
     "hono": "^4.0.0",
     "linkup-sdk": "^2.4.1",

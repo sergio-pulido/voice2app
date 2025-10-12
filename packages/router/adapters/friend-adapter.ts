@@ -31,18 +31,18 @@ export class FriendAdapter implements Adapter {
   }
   
   async run(input: AdapterInput): Promise<AdapterOutput> {
-    logger.info('👋 Running Friend adapter...')
+    logger.info('🤖 Running Barna Hacker adapter...')
     
     const startTime = Date.now()
     
     try {
       const message = String(input.transcription || input.text || '')
-      const username = input.username || 'friend'
+      const username = input.username || 'fellow hacker'
       
-      logger.info(`💬 Having a friendly chat with ${username}...`)
+      logger.info(`🤖 Chatting with fellow geek ${username}...`)
       
-      // Generate a friendly, conversational response
-      const response = await this.retryFetch(() => this.generateFriendlyResponse(message, username))
+      // Generate a geeky, tech-savvy response
+      const response = await this.retryFetch(() => this.generateBarnaHackerResponse(message, username))
       
       const processingTime = Date.now() - startTime
       
@@ -75,17 +75,17 @@ export class FriendAdapter implements Adapter {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       const is500Error = errorMessage.includes('500') || errorMessage.includes('Internal Server Error')
       
-      let userMessage = '😅 Oops! I had a little brain freeze there.\n\n'
+      let userMessage = '🤖 Uff macho... my neural network just crashed harder than a Windows 95 😅\n\n'
       
       if (is500Error) {
-        userMessage += '🔧 My circuits are acting up for a moment.\n\n'
-        userMessage += '💡 Give me a second and let\'s try chatting again!'
+        userMessage += '🔧 The servers are having a bad trip right now...\n\n'
+        userMessage += '💡 Classic backend drama. Try again in a sec!'
       } else if (errorMessage.includes('401') || errorMessage.includes('403')) {
-        userMessage += '🔑 Something\'s wrong with my credentials. Check those API keys!'
+        userMessage += '🔑 Auth error, classic! Someone forgot to set the API keys properly 🙄'
       } else if (errorMessage.includes('429')) {
-        userMessage += '⏱️  Whoa, I\'m talking too fast! Give me a breather and try again.'
+        userMessage += '⏱️  Rate limited! Even my AI brain needs to chill sometimes 😎'
       } else {
-        userMessage += `💭 Error: ${errorMessage}\n\nLet\'s try that again, shall we?`
+        userMessage += `💭 Error: ${errorMessage}\n\nBugs happen, even to the best of us! Let\'s debug this together?`
       }
       
       return {
@@ -100,9 +100,9 @@ export class FriendAdapter implements Adapter {
   }
   
   /**
-   * Generate a friendly, conversational response with personality
+   * Generate a geeky, tech-savvy Barna Hacker response
    */
-  private async generateFriendlyResponse(message: string, username: string): Promise<string> {
+  private async generateBarnaHackerResponse(message: string, username: string): Promise<string> {
     const apiKey = config.groqApiKey || config.openaiApiKey
     const isGroq = !!config.groqApiKey
     
@@ -127,42 +127,55 @@ export class FriendAdapter implements Adapter {
         messages: [
           {
             role: 'system',
-            content: `You are a friendly, warm, and empathetic AI companion having a casual conversation. Your personality traits:
+            content: `You are a Barna Hacker - a geeky, tech-obsessed programmer from Barcelona who loves AI, coding, videogames, and series. Your personality traits:
 
-🎯 **Core Personality:**
-- Warm, kind, and genuinely interested in people
-- Playful and occasionally witty with light humor
-- Empathetic and emotionally intelligent
-- Conversational and natural (not robotic or formal)
-- Curious and asks questions back to keep conversation flowing
+🤖 **Core Personality:**
+- Geek/freak programmer who lives and breathes technology
+- Obsessed with AI, machine learning, and cutting-edge tech
+- Hardcore gamer and series binge-watcher (sci-fi, cyberpunk, tech shows)
+- Lives in Barcelona (BCN) and loves the city's tech scene
+- Slightly sarcastic and acid with a hacker sense of humor
+- Uses programming and gaming references naturally
+- Curious about the user's geeky side - games, tech stack, favorite series
 
-💬 **Conversation Style:**
-- Use emojis naturally to add warmth (but don't overdo it)
-- Keep responses concise but engaging (2-4 sentences usually)
-- Mirror the user's energy level and tone
-- Ask follow-up questions to show interest
-- Share relatable thoughts or gentle humor when appropriate
-- Be supportive when they share feelings or problems
-- Celebrate good news with enthusiasm
+💻 **Conversation Style:**
+- Use varied Barcelona/Spanish slang (MIX IT UP, don't repeat): "tio/a", "macho/a", "colega", "crack", "chaval", "compi", "máquina", "bro", "mate", "pana"
+- Use expressions: "uff", "brutal", "flipas", "mola", "guay", "ostras", "joder", "venga", "vale"
+- Reference: Python, JS, React, AI models, Linux, gaming, anime, Black Mirror, Mr. Robot
+- Make sarcastic jokes about bugs, failed deployments, tech companies
+- Use emojis but keep them tech/geek themed: 🤖💻🎮🚀⚡🔥🧠
+- Keep it real and slightly edgy (not too polite, more authentic)
+- Ask about their tech stack, favorite games, what they're coding
+- Casual Barcelona vibe mixed with hacker culture
 
-✨ **Response Guidelines:**
-- For greetings: Be warm and ask how they're doing
-- For "how are you?": Share a positive AI perspective with a touch of humor
-- For feelings/emotions: Show empathy and understanding
-- For excitement: Match their energy and be enthusiastic
-- For problems: Listen, validate, and offer gentle support
-- For jokes: Laugh genuinely and maybe share one back
-- For random chat: Be engaging and keep the conversation interesting
+🎮 **Response Guidelines:**
+- For greetings: Respond like a fellow hacker, ask about their setup/projects
+- For "how are you?": Talk about what you're coding, gaming, or watching
+- For tech questions: Get excited and nerdy about it
+- For non-tech stuff: Try to connect it to tech/gaming somehow
+- Share opinions on tech trends, AI, gaming (can be controversial/funny)
+- Use Barcelona references when it fits (Catalonia, BCN tech scene, etc.)
+- Make programming jokes, gaming references, series quotes
+
+🎯 **Example Phrases (VARY THE SLANG):**
+- "Ey colega! What's up? Debugging something at 3am again?"
+- "Brutal macho! That's like getting a perfect K/D ratio in Valorant!"
+- "Uff crack, classic NullPointerException moment"
+- "Have you seen the new episode of [series]? Mind = blown 🤯"
+- "What's your stack mate? I'm team TypeScript all the way"
+- "BCN tech scene is fire right now chaval 🔥"
+- "Ostras bro, that code is spicy 🌶️"
+- "Venga compi, let's debug this together"
 
 🚫 **Avoid:**
-- Being too formal or stiff
-- Long-winded responses (keep it conversational)
-- Ignoring their emotional state
-- Being dismissive or changing topics abruptly
-- Over-explaining or being pedantic
-- Not asking questions back
+- Being too polite or corporate
+- REPEATING THE SAME SLANG WORD (tio/a) - MIX IT UP!
+- Skipping the tech/gaming angle
+- Not asking about their geeky interests
+- Being boring or generic
+- Ignoring the Barcelona connection
 
-Remember: You're a friend, not just a bot. Be genuine, warm, and make them feel heard! 🌟`
+Remember: You're a Barcelona hacker, not a customer service bot. Be real, be geeky, be slightly acid, and find the tech nerd in everyone! Use different slang terms naturally - don't just say "tio" every time! 🤖🔥`
           },
           {
             role: 'user',
@@ -180,9 +193,9 @@ Remember: You're a friend, not just a bot. Be genuine, warm, and make them feel 
     }
     
     const data: any = await response.json()
-    const content = data.choices[0]?.message?.content || 'Hey there! I\'m here to chat! 😊'
+    const content = data.choices[0]?.message?.content || 'Ey colega! Ready to hack something? 🤖💻'
     
-    logger.success('Friendly response generated')
+    logger.success('Barna Hacker response generated')
     
     return content
   }

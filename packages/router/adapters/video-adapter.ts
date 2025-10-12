@@ -5,8 +5,7 @@
 
 import { logger, config } from '../../shared'
 import { translate } from '../services/free-translation-service'
-import { generateVideoWithFabricRetry } from '../services/fal-video-service'
-import { generateImageWithGeminiRetry } from '../services/gemini-image-service'
+import { startVideoSession } from '../../shared/video-state-manager'
 import type { Adapter, AdapterInput, AdapterOutput } from '../types'
 
 export class VideoAdapter implements Adapter {
@@ -25,71 +24,19 @@ export class VideoAdapter implements Adapter {
       
       logger.debug(`Video prompt: "${prompt}"`)
       
-      // For Fabric 1.0, we need both an image and audio
-      // Since we typically get voice input, we'll generate an image from the prompt
-      // and use the audio file if available
+      // Start a new video generation session (3-step conversational flow)
+      logger.info(`🎬 Starting 3-step video generation for user ${input.userId}`)
+      startVideoSession(input.userId, prompt)
       
-      // Step 1: Generate an image from the prompt
-      logger.info('🎨 Generating image for video...')
-      const imagePath = await generateImageWithGeminiRetry(prompt)
-      
-      if (!imagePath) {
-        throw new Error('Failed to generate image for video')
-      }
-      
-      // Step 2: Check if we have audio input
-      // Note: You may need to store/provide the audio URL from the voice message
-      // For now, we'll return a message explaining the limitation
-      
-      if (!input.audioUrl) {
-        logger.warn('No audio URL provided - video generation requires audio')
-        
-        let response = 
-          `🎬 **Video Generation**\n\n` +
-          `I generated an image for your prompt: "${prompt}"\n\n` +
-          `However, to create a talking video with fal.ai Fabric 1.0, I need:\n` +
-          `• ✅ An image (generated)\n` +
-          `• ❌ An audio file (not available)\n\n` +
-          `💡 The image has been saved. In a future version, we'll combine your voice with the image!`
-        
-        // Translate if needed
-        const targetLang = input.detectedLang || 'en'
-        if (targetLang !== 'en') {
-          response = await this.translateResponse(response, targetLang)
-        }
-        
-        return {
-          summaryText: response,
-          ttsText: `I generated an image for your video prompt, but need audio to complete the video.`,
-          imagePath,
-          metadata: {
-            category: 'video_gen',
-            processingTime: Date.now() - startTime,
-            status: 'partial',
-            prompt,
-            imagePath
-          }
-        }
-      }
-      
-      // Step 3: Generate video with fal.ai Fabric 1.0
-      logger.info('🎬 Generating video with fal.ai Fabric 1.0...')
-      const videoPath = await generateVideoWithFabricRetry({
-        imageUrl: imagePath,
-        audioUrl: input.audioUrl,
-        resolution: '720p'
-      })
-      
-      if (!videoPath) {
-        throw new Error('Failed to generate video with fal.ai')
-      }
-      
-      // Success!
+      // Ask user for image (photo or text description)
       let response = 
-        `🎬 **Video Generated Successfully!**\n\n` +
-        `Prompt: "${prompt}"\n\n` +
-        `Your talking video has been created using fal.ai Fabric 1.0.\n` +
-        `The video combines your generated image with audio to create an animated result.`
+        `🎬 **Let's Create a Video!** (3-Step Process)\n\n` +
+        `📋 Your request: "${prompt}"\n\n` +
+        `**Step 1/3:** Please provide an image for your video.\n\n` +
+        `You can either:\n` +
+        `• 📸 **Send a photo** - Upload an image from your gallery\n` +
+        `• 📝 **Describe it** - Send a text description and I'll generate an image\n\n` +
+        `💡 Example: "A professional presenter in a suit" or send a photo of yourself`
       
       // Translate if needed
       const targetLang = input.detectedLang || 'en'
@@ -101,16 +48,12 @@ export class VideoAdapter implements Adapter {
       
       return {
         summaryText: response,
-        ttsText: `Your video has been generated successfully!`,
-        imagePath,
-        videoPath,
+        ttsText: `Let's create a video! First, send me a photo or describe the image you want.`,
         metadata: {
           category: 'video_gen',
           processingTime,
-          status: 'success',
-          prompt,
-          imagePath,
-          videoPath
+          status: 'partial',
+          prompt
         }
       }
     } catch (error) {

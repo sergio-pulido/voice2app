@@ -33,10 +33,11 @@ I can help you with many tasks using just your voice or text!
 
 **🎯 What I Can Do:**
 
-**👋 Friendly Chat**
-• Casual conversation with empathy and personality
-• I can chat, share jokes, and be your friendly companion
-  _Example: "Hello!", "How are you?", "Tell me a joke"_
+**🤖 Barna Hacker**
+• Chat with a geeky Barcelona programmer who loves AI, tech, gaming & series
+• Slightly sarcastic, tech-obsessed, and always curious about your setup
+• Will connect everything to code, games, or the latest tech trends
+  _Example: "Hey! What's up?", "What are you coding?", "Favorite game?"_
 
 **💬 Q&A (Question Answering)**
 • Simple questions → Fast answers with Groq AI (2-3s)
@@ -70,25 +71,25 @@ I can help you with many tasks using just your voice or text!
 • **Auto-Translation**: I automatically detect and translate non-English input
 
 **💡 Pro Tips:**
-• Talk to me like a friend - I'm here to chat!
+• Talk to me like a fellow hacker - I speak geek fluently! 🤖
 • Be specific with your requests for better results
 • For images, describe what you want in detail
 • For apps, explain the features you need
 • I work in multiple languages - speak naturally!
 
 **Examples:**
-• "Hey! How's it going?"
-• "What are the main hormones in the body?"
-• "Generate an image of a robot in a forest"
-• "Translate the next to Spanish: [your text]"
-• "Build a todo list app with dark mode"
-• "How does the European Union work?"
+• "Ey! What are you coding today?" (chat with Barna Hacker)
+• "What are the main hormones in the body?" (Q&A)
+• "Generate an image of a cyberpunk hacker in Barcelona" (image)
+• "Translate the next to Spanish: [your text]" (translation)
+• "Build a todo list app with dark mode" (app builder)
+• "How does the European Union work?" (Q&A)
 
 **Need more help?** Just ask me anything! 🚀`
   }
   
   private getTTSVersion(): string {
-    return `I'm Voice2App, your AI assistant and friendly companion! I can chat with you casually, answer questions with Groq AI or web search, generate images with Stable Diffusion, translate between languages, and even build complete apps from voice descriptions. I support friendly conversation, simple Q&A, complex research, image generation, translation, and full app development with testing. Just speak naturally or type your request, and I'll handle the rest!`
+    return `I'm Voice2App, your AI assistant! I can chat with you like a geeky Barcelona hacker who loves tech and gaming, answer questions with Groq AI or web search, generate images with Stable Diffusion, translate between languages, and even build complete apps from voice descriptions. I support casual tech chat, simple Q&A, complex research, image generation, translation, and full app development with testing. Just speak naturally or type your request, and I'll handle the rest!`
   }
 }
 

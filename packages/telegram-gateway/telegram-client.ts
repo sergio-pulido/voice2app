@@ -41,6 +41,41 @@ export async function downloadVoiceFile(fileId: string): Promise<Buffer | null> 
   }
 }
 
+export async function downloadPhotoFile(fileId: string): Promise<Buffer | null> {
+  try {
+    // Get file path from Telegram
+    const fileUrl = `${TELEGRAM_API_BASE}${config.telegramBotToken}/getFile?file_id=${fileId}`
+    const fileResponse = await fetch(fileUrl)
+    const fileData = await fileResponse.json() as {
+      ok: boolean
+      result?: { file_path: string }
+    }
+    
+    if (!fileData.ok || !fileData.result?.file_path) {
+      logger.error('Failed to get file path:', fileData)
+      return null
+    }
+    
+    // Download the actual file
+    const downloadUrl = `https://api.telegram.org/file/bot${config.telegramBotToken}/${fileData.result.file_path}`
+    logger.debug('Downloading photo file from:', downloadUrl)
+    
+    const downloadResponse = await fetch(downloadUrl)
+    if (!downloadResponse.ok) {
+      logger.error('Failed to download file:', downloadResponse.status)
+      return null
+    }
+    
+    const buffer = Buffer.from(await downloadResponse.arrayBuffer())
+    logger.success(`Downloaded photo file: ${buffer.length} bytes`)
+    
+    return buffer
+  } catch (error) {
+    logger.error('Error downloading photo file:', error)
+    return null
+  }
+}
+
 export async function sendMessage(chatId: number, text: string): Promise<void> {
   const url = `${TELEGRAM_API_BASE}${config.telegramBotToken}/sendMessage`
   

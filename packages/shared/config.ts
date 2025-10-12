@@ -57,6 +57,7 @@ export const config = {
   // Model Settings
   llmModel: process.env.LLM_MODEL || 'gpt-4o-mini',
   llmTemperature: parseFloat(process.env.LLM_TEMPERATURE || '0.7'),
+  imageModel: process.env.IMAGE_MODEL || 'playgroundai/playground-v2.5-1024px-aesthetic',
   
   // Runner Settings
   runnerTimeout: parseInt(process.env.RUNNER_TIMEOUT || '30000'), // 30s
