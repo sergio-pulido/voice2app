@@ -7,6 +7,7 @@ import type { STTResult } from './types'
 export type STTProvider = 'openai' | 'elevenlabs'
 export type LLMProvider = 'openai' | 'anthropic' | 'groq'
 export type TTSProvider = 'openai' | 'elevenlabs'
+export type ImageProvider = 'gemini' | 'huggingface'
 
 export interface LLMMessage {
   role: 'system' | 'user' | 'assistant'

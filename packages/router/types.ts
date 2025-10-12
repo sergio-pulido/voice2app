@@ -11,6 +11,7 @@ export interface AdapterInput {
   username?: string
   transcription?: string  // Transcribed text from voiceBuffer (STTResult.text)
   voiceBuffer?: Buffer
+  audioUrl?: string       // URL to the audio file (for video generation)
   originalText?: string   // Original text before normalization
   detectedLang?: string   // Detected language from Lingo
 }
@@ -19,11 +20,13 @@ export interface AdapterOutput {
   summaryText: string
   ttsText?: string
   attachments?: string[]
+  imagePath?: string      // Path to generated image (for image/video adapters)
+  videoPath?: string      // Path to generated video (for video adapter)
   metadata?: {
     category: IntentCategory
     processingTime?: number
     filesGenerated?: number
-    status?: 'success' | 'partial' | 'error'
+    status?: 'success' | 'partial' | 'error' | 'unconfigured'
     transcription?: string  // Original voice transcription
     detectedLang?: string   // Detected language
     originalText?: string   // Original text before normalization

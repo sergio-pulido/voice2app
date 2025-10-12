@@ -12,10 +12,11 @@ You can build while walking, running, or hiking — completely hands-free.
 
 **🚀 Major Improvements:**
 
+- 👋 **Friendly Chat Mode**: NEW! Conversational AI with empathy, personality, and humor - chat casually, get emotional support, or just say hello!
 - 🌐 **Multi-Language Support**: MyMemory API integration with automatic language detection and translation
 - 🔄 **Auto-Translate Pipeline**: Detects language → translates to English for processing → translates response back to original language
 - 🗣️ **Translation Tool**: Dedicated adapter for explicit translation requests with 7+ pattern matching formats
-- 🧠 **Intelligent AI Router**: Groq LLM-powered intent classification with smart fallback - no keyword matching, always routes correctly!
+- 🧠 **Intelligent AI Router**: Groq LLM-powered intent classification with smart fallback - now recognizes 7 intent types including friendly conversation!
 - 🎨 **Image Generation**: HuggingFace Stable Diffusion XL (1024x1024) with retry logic and smart error handling
 - 🔍 **Smart Q&A System**: Groq automatically assesses complexity - simple questions get instant answers, complex ones use Linkup web search
 - 🛡️ **Robust Error Handling**: Automatic retries for API failures (Groq, HuggingFace) with exponential backoff
@@ -23,7 +24,8 @@ You can build while walking, running, or hiking — completely hands-free.
 - 🎤 **Voice-to-Voice**: Send voice, get voice back! Full TTS/STT integration with ElevenLabs/OpenAI
 - ⚡ **Input Validation**: Safeguards check length, content quality before processing
 - ⚙️ **Configurable Channels**: Enable/disable WhatsApp and Discord admin notifications independently
-- 🎯 **Multi-Provider AI**: Support for Groq/OpenAI/Anthropic (LLMs), ElevenLabs/OpenAI (STT/TTS), HuggingFace (Image Gen)
+- 🎯 **Multi-Provider AI**: Support for Groq/OpenAI/Anthropic (LLMs), ElevenLabs/OpenAI (STT/TTS), HuggingFace/Gemini (Image Gen), fal.ai (Video Gen)
+- 🎬 **Video Generation**: fal.ai Fabric 1.0 integration for image-to-video animations (talking videos)
 - 🚀 **Makefile + Hookdeck CLI**: One command (`make dev`) to start server + dual tunnels
 - 🔧 **Production Ready**: Comprehensive error handling, retry logic, and user-friendly error messages
 
@@ -44,6 +46,7 @@ You can build while walking, running, or hiking — completely hands-free.
 - 🎯 See which AI tool was used for each request
 
 **For Customers**:
+- 👋 Chat casually like with a friend - get empathy, jokes, and genuine conversation
 - 🌐 Talk in ANY language - automatic translation to/from English
 - 💬 Natural voice interaction with voice responses
 - 🗣️ Built-in translation tool - "Translate 'text' to Spanish"
@@ -80,7 +83,12 @@ make clean
 ```bash
 # Verify your environment
 bun run scripts/test-setup.ts
+
+# Test voice input/output (comprehensive testing)
+bun run test:voice
 ```
+
+📚 **New to testing?** See [TEST_INSTRUCTIONS.md](./TEST_INSTRUCTIONS.md) for a complete walkthrough!
 
 ---
 
@@ -196,10 +204,12 @@ The system uses **Groq LLM** to intelligently classify and route requests with h
 - **Smart retry logic** - Handles model loading and API issues gracefully
 - **Free tier available** - Get API key from huggingface.co with "Inference Providers" permission
 
-**🎬 Video Generator** - Generate video clips (coming soon):
-- "Create a short video about AI"
-- "Make a promotional clip"
-- "Generate an explainer video"
+**🎬 Video Generator** - Create talking videos with fal.ai Fabric 1.0:
+- "Generate a video of a person talking about AI"
+- Combines AI-generated images with audio to create animated videos
+- Supports 480p ($0.08/sec) and 720p ($0.15/sec) resolution
+- Image-to-video technology powered by VEED Fabric 1.0
+- **Note**: Requires both an image and audio input
 
 **How It Works**:
 1. 🎤 **Voice Transcription** - Convert voice to text (ElevenLabs/OpenAI)
@@ -281,6 +291,10 @@ The system uses **Groq LLM** to intelligently classify and route requests with h
 
 **Image Generation**:
 - HuggingFace (stabilityai/stable-diffusion-xl-base-1.0) - 1024x1024 images with retry logic
+- Google Gemini (Imagen 3) - High-quality image generation
+
+**Video Generation**:
+- fal.ai (VEED Fabric 1.0) - Image-to-video talking animations with retry logic
 
 **Translation**:
 - MyMemory API (mymemory.translated.net) - Free, reliable translation API
@@ -330,7 +344,10 @@ The system uses **Groq LLM** to intelligently classify and route requests with h
    └─ Return image with metadata
 
 4d. Video Generation Path
-   └─ Coming soon
+   └─ Generate image from prompt (Gemini Imagen 3)
+   └─ Combine with audio using fal.ai Fabric 1.0
+   └─ Save video to artifacts/ directory
+   └─ Return video with metadata
 
 4e. Translation Path
    └─ Pattern matching (7+ formats)
@@ -360,7 +377,8 @@ The system uses **Groq LLM** to intelligently classify and route requests with h
 | **Translation**   | MyMemory API (free, reliable, smart detection, chunking) |
 | **AI Router**     | Groq LLM classification with smart fallback → 5 tools |
 | **Web Search**    | Linkup SDK (AI-powered search triggered by Groq) |
-| **Image Gen**     | HuggingFace Stable Diffusion XL (1024x1024 PNG) with retry logic |
+| **Image Gen**     | HuggingFace SDXL + Gemini Imagen 3 (1024x1024 PNG) with retry logic |
+| **Video Gen**     | fal.ai Fabric 1.0 (image-to-video, 480p/720p MP4) with retry logic |
 | **STT**           | ElevenLabs (scribe_v1) + OpenAI Whisper |
 | **TTS**           | ElevenLabs (eleven_monolingual_v1) |
 | **LLMs**          | Groq (llama-3.3-70b) for routing & Q&A + OpenAI + Anthropic |
@@ -566,6 +584,10 @@ LINKUP_API_KEY=your_linkup_api_key          # For web search - get from linkup.s
 
 # Image Generation (optional)
 HUGGINGFACE_API_KEY=your_huggingface_api_key  # For image generation - get from huggingface.co
+GEMINI_API_KEY=your_gemini_api_key            # For Gemini Imagen 3 generation
+
+# Video Generation (optional)
+FAL_API_KEY=your_fal_api_key                  # For fal.ai Fabric 1.0 video generation - get from fal.ai
 
 # Translation (built-in, no API key needed!)
 # Uses MyMemory free API - smart language detection + reliable translation
@@ -966,10 +988,22 @@ Simplified local development:
 - 8-15 second generation time (faster with retries)
 - Graceful handling of API issues
 
-### Video Examples (Coming Soon)
+### Video Generation Examples
 
-> 📝 "Create a short video about coding"  
-> Response: "🎬 Video generation coming soon..."
+> 📝 "Generate a video of a person talking about AI"  
+> Response: [System generates image → Combines with audio → Returns talking video]
+
+> 🎤 "Create a talking video for my presentation"  
+> Response: "🎬 Your video has been generated successfully!" + [Video file]
+
+**Features**:
+- Image-to-video technology powered by fal.ai Fabric 1.0
+- Generates talking/animated videos from static images
+- Requires both image and audio input
+- Supports 480p and 720p resolution
+- Saved to `artifacts/` directory
+- **Note**: Currently generates image from text prompt, but audio URL needed for full video generation
+- Pricing: 480p - $0.08/sec, 720p - $0.15/sec
 
 ### What You'll Receive
 
@@ -1074,6 +1108,12 @@ make dev
 - **[docs/DISCORD_ADMIN.md](./docs/DISCORD_ADMIN.md)** - **⭐ Discord admin setup (recommended!)**
 - **[docs/ADMIN_NOTIFICATIONS.md](./docs/ADMIN_NOTIFICATIONS.md)** - WhatsApp admin guide (optional)
 - **[docs/PROVIDERS.md](./docs/PROVIDERS.md)** - AI provider configuration
+
+### Testing Guides
+- **[TEST_INSTRUCTIONS.md](./TEST_INSTRUCTIONS.md)** - **⭐ Complete voice testing walkthrough**
+- **[TESTING_QUICK_REF.md](./TESTING_QUICK_REF.md)** - Quick reference card for testing
+- **[docs/QUICK_VOICE_TEST.md](./docs/QUICK_VOICE_TEST.md)** - 5-minute quick test
+- **[docs/VOICE_TESTING.md](./docs/VOICE_TESTING.md)** - Comprehensive testing guide
 
 ### System Documentation
 - **[docs/AI_ROUTER.md](./docs/AI_ROUTER.md)** - **⭐ AI Router and multi-tool system**

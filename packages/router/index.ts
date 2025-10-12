@@ -4,7 +4,7 @@
 
 import { logger, config } from '../shared'
 import { detectIntent, getCategoryName, getCategoryEmoji, type IntentCategory } from './intent-router'
-import { qaAdapter, appCodeAdapter, imageAdapter, videoAdapter, translateAdapter, helpAdapter } from './adapters'
+import { qaAdapter, appCodeAdapter, imageAdapter, videoAdapter, translateAdapter, helpAdapter, friendAdapter } from './adapters'
 import type { AdapterInput, AdapterOutput } from './types'
 
 // Import STT functionality
@@ -87,6 +87,10 @@ export async function routeRequest(input: AdapterInput): Promise<AdapterOutput> 
   switch (intent.category) {
     case 'help':
       result = await helpAdapter.run(adapterInput)
+      break
+      
+    case 'friend':
+      result = await friendAdapter.run(adapterInput)
       break
       
     case 'qa':

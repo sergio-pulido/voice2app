@@ -1,16 +1,47 @@
-# 🎨 Image Generation with HuggingFace
+# 🎨 AI Image Generation
 
 ## Overview
 
-Voice2App now supports **AI image generation** using HuggingFace's Stable Diffusion XL model!
+Voice2App supports **AI image generation** with multiple providers:
 
-Send an image request via Telegram and receive a high-quality AI-generated image.
+- **🌟 Google Gemini (Imagen 3)** - Also known as "Nano Banana" - **RECOMMENDED!**
+- **HuggingFace (Stable Diffusion XL)** - Alternative option
+
+Send an image request via Telegram and receive a high-quality AI-generated image!
 
 ---
 
 ## Setup (5 minutes)
 
-### 1. Get HuggingFace API Key
+### Option A: Google Gemini (Recommended) 🌟
+
+#### 1. Get Gemini API Key
+
+1. Go to: https://ai.google.dev
+2. Sign in with your Google account
+3. Click **Get API Key**
+4. Create a new API key
+5. Copy the token
+
+#### 2. Add to Environment
+
+Add to your `.env` file:
+
+```env
+IMAGE_PROVIDER=gemini
+GEMINI_API_KEY=your_gemini_api_key_here
+```
+
+#### 3. Restart Server
+
+```bash
+make clean
+make dev
+```
+
+### Option B: HuggingFace (Alternative)
+
+#### 1. Get HuggingFace API Key
 
 1. Go to: https://huggingface.co
 2. Sign up for a free account
@@ -20,15 +51,16 @@ Send an image request via Telegram and receive a high-quality AI-generated image
 6. Type: **Read**
 7. Copy the token
 
-### 2. Add to Environment
+#### 2. Add to Environment
 
 Add to your `.env` file:
 
 ```env
+IMAGE_PROVIDER=huggingface
 HUGGINGFACE_API_KEY=hf_your_api_key_here
 ```
 
-### 3. Restart Server
+#### 3. Restart Server
 
 ```bash
 make clean
@@ -70,10 +102,16 @@ Prompt: "Generate a logo for a tech startup"
 
 Your AI-generated image is ready! ✨
 
-Generated with: Stable Diffusion XL
-Time: 15.2s
+Generated with: Google Gemini (Nano Banana / Imagen 3)
+Time: 4.2s
 
 [Image attached]
+```
+
+Or with HuggingFace:
+```
+Generated with: Stable Diffusion XL
+Time: 15.2s
 ```
 
 ### On Discord/WhatsApp (Admin)
@@ -248,10 +286,31 @@ Try these prompts:
 
 ---
 
+---
+
+## Provider Comparison
+
+| Feature | Google Gemini (Imagen 3) 🌟 | HuggingFace (SDXL) |
+|---------|----------------------------|-------------------|
+| **Quality** | ⭐⭐⭐⭐⭐ Excellent | ⭐⭐⭐⭐ Very Good |
+| **Speed** | 🚀 Fast (3-5s) | 🐢 Slower (10-30s) |
+| **Cold Start** | ✅ No delay | ⚠️ Yes (20-30s first time) |
+| **Free Tier** | Limited daily requests | Yes, with rate limits |
+| **Prompt Understanding** | 🧠 Excellent | Good |
+| **Subject Consistency** | ✅ Maintains characters | ⚠️ Less consistent |
+| **Setup** | Easy (Google account) | Easy (Free signup) |
+| **Best For** | Production use | Testing & experimentation |
+
+**Recommendation**: Use **Gemini** for better quality and faster generation! Fall back to HuggingFace if needed.
+
+---
+
 **Ready to generate images?** 
 
-Add your HuggingFace API key and try:
+Add your Gemini API key and try:
 > 📝 "Generate a logo for a tech startup"
 
-You'll receive a beautiful AI-generated image! 🎨
+You'll receive a beautiful AI-generated image in seconds! 🎨
+
+For more details on Gemini image generation, see: [GEMINI_IMAGE_GENERATION.md](./GEMINI_IMAGE_GENERATION.md)
 

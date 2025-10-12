@@ -4,7 +4,7 @@
 
 import { logger } from '../shared'
 
-export type IntentCategory = 'qa' | 'app_code' | 'image_gen' | 'video_gen' | 'translate' | 'help'
+export type IntentCategory = 'qa' | 'app_code' | 'image_gen' | 'video_gen' | 'translate' | 'help' | 'friend'
 
 export interface IntentResult {
   category: IntentCategory
@@ -76,6 +76,27 @@ function fastClassify(text: string): IntentResult | null {
   for (const keyword of helpKeywords) {
     if (lowerText.includes(keyword)) {
       return { category: 'help', confidence: 0.95 }
+    }
+  }
+  
+  // Friend/Chat keywords (conversational, casual interactions)
+  const friendKeywords = [
+    'hello', 'hi', 'hey', 'hola', 'good morning', 'buenos días',
+    'good afternoon', 'buenas tardes', 'good evening', 'buenas noches',
+    'how are you', 'how r u', 'cómo estás', 'qué tal',
+    'how are you doing', 'how are you feeling', 'cómo te sientes',
+    'what\'s up', 'wassup', 'qué pasa', 'qué onda',
+    'nice to meet', 'encantado', 'mucho gusto',
+    'good night', 'see you', 'hasta luego', 'adiós',
+    'thank you', 'thanks', 'gracias', 'thx',
+    'i\'m happy', 'i\'m sad', 'i\'m tired', 'i\'m excited',
+    'tell me a joke', 'make me laugh', 'cuéntame un chiste',
+    'you\'re funny', 'you\'re cool', 'eres gracioso'
+  ]
+  
+  for (const keyword of friendKeywords) {
+    if (lowerText.includes(keyword)) {
+      return { category: 'friend', confidence: 0.92 }
     }
   }
   
@@ -259,24 +280,27 @@ async function groqClassify(text: string): Promise<IntentResult> {
 1. "help" - Asking about capabilities, features, or how to use the system
    Examples: "What can you do?", "Help", "What are your features?", "How do I use this?"
 
-2. "qa" - Questions, explanations, information requests
+2. "friend" - Casual conversation, greetings, small talk, personal interactions
+   Examples: "Hello!", "How are you?", "What's up?", "Tell me a joke", "I'm feeling happy", "Good morning", "Thanks!", "You're cool"
+
+3. "qa" - Questions, explanations, information requests (factual)
    Examples: "What is X?", "Explain Y", "Tell me about Z", "How does X work?"
 
-3. "app_code" - Building apps, websites, components, code
+4. "app_code" - Building apps, websites, components, code
    Examples: "Create a counter app", "Build a landing page", "Make a todo list"
 
-4. "image_gen" - Generating images, logos, illustrations
+5. "image_gen" - Generating images, logos, illustrations
    Examples: "Generate a logo", "Create an image of X", "Draw a picture", "I want an image of X"
 
-5. "video_gen" - Generating videos, clips, animations
+6. "video_gen" - Generating videos, clips, animations
    Examples: "Create a video", "Make a clip", "Generate video about X"
 
-6. "translate" - Translation requests
+7. "translate" - Translation requests
    Examples: "Translate 'Hello' to Spanish", "How do you say 'Good morning' in French?", "What is 'cat' in German?"
 
-Respond with ONLY ONE WORD: help, qa, app_code, image_gen, video_gen, or translate
+Respond with ONLY ONE WORD: help, friend, qa, app_code, image_gen, video_gen, or translate
 
-Default to "qa" if uncertain.`
+Default to "friend" for greetings/casual talk, "qa" for factual questions.`
             },
             {
               role: 'user',
@@ -303,7 +327,7 @@ Default to "qa" if uncertain.`
       const result = data.choices[0]?.message?.content?.trim().toLowerCase() || 'qa'
       
       // Validate the response
-      const validCategories: IntentCategory[] = ['help', 'qa', 'app_code', 'image_gen', 'video_gen', 'translate']
+      const validCategories: IntentCategory[] = ['help', 'friend', 'qa', 'app_code', 'image_gen', 'video_gen', 'translate']
       const category = validCategories.includes(result as IntentCategory) 
         ? result as IntentCategory 
         : 'qa'
@@ -369,6 +393,7 @@ export async function detectIntent(input: RouterInput): Promise<IntentResult> {
 export function getCategoryName(category: IntentCategory): string {
   const names: Record<IntentCategory, string> = {
     'help': '❓ Help',
+    'friend': '👋 Friendly Chat',
     'qa': '💬 Q&A',
     'app_code': '💻 App Builder',
     'image_gen': '🎨 Image Generator',
@@ -384,6 +409,7 @@ export function getCategoryName(category: IntentCategory): string {
 export function getCategoryEmoji(category: IntentCategory): string {
   const emojis: Record<IntentCategory, string> = {
     'help': '❓',
+    'friend': '👋',
     'qa': '💬',
     'app_code': '💻',
     'image_gen': '🎨',

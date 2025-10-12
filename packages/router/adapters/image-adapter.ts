@@ -1,9 +1,11 @@
 /**
- * Image Generation Adapter - HuggingFace Integration
+ * Image Generation Adapter - Multi-Provider Support
+ * Supports: Google Gemini (Nano Banana / Imagen 3) and HuggingFace (Stable Diffusion XL)
  */
 
 import { logger, config } from '../../shared'
 import { generateImageWithRetry } from '../services/huggingface-service'
+import { generateImageWithGeminiRetry } from '../services/gemini-image-service'
 import { translate } from '../services/free-translation-service'
 import type { Adapter, AdapterInput, AdapterOutput } from '../types'
 
@@ -13,18 +15,37 @@ export class ImageAdapter implements Adapter {
     
     const startTime = Date.now()
     const prompt = String(input.transcription || input.text || '')
+    const provider = config.imageProvider
     
     try {
-      // Check if HuggingFace is configured
-      if (!config.huggingfaceApiKey) {
+      // Check if the selected provider is configured
+      if (provider === 'gemini' && !config.geminiApiKey) {
         return {
           summaryText: 
             `🎨 **Image Generation**\n\n` +
-            `To generate images, you need to configure HuggingFace:\n\n` +
+            `To generate images with Google Gemini (Nano Banana), you need to:\n\n` +
+            `1. Get a free API key from ai.google.dev\n` +
+            `2. Add to .env: GEMINI_API_KEY=your_key\n` +
+            `3. Restart the server\n\n` +
+            `Alternatively, set IMAGE_PROVIDER=huggingface to use Stable Diffusion XL.`,
+          ttsText: `Gemini API key not configured. Add it to your environment to enable image generation.`,
+          metadata: {
+            category: 'image_gen',
+            processingTime: Date.now() - startTime,
+            status: 'partial'
+          }
+        }
+      }
+      
+      if (provider === 'huggingface' && !config.huggingfaceApiKey) {
+        return {
+          summaryText: 
+            `🎨 **Image Generation**\n\n` +
+            `To generate images with HuggingFace, you need to:\n\n` +
             `1. Get a free API key from huggingface.co\n` +
             `2. Add to .env: HUGGINGFACE_API_KEY=your_key\n` +
             `3. Restart the server\n\n` +
-            `Then I'll be able to generate images from your descriptions!`,
+            `Alternatively, set IMAGE_PROVIDER=gemini to use Google's Nano Banana.`,
           ttsText: `HuggingFace API key not configured. Add it to your environment to enable image generation.`,
           metadata: {
             category: 'image_gen',
@@ -35,9 +56,19 @@ export class ImageAdapter implements Adapter {
       }
       
       logger.debug(`Image prompt: "${prompt}"`)
+      logger.info(`Using image provider: ${provider}`)
       
-      // Generate image with HuggingFace
-      const imagePath = await generateImageWithRetry(prompt)
+      // Generate image with selected provider
+      let imagePath: string | null
+      let modelName: string
+      
+      if (provider === 'gemini') {
+        imagePath = await generateImageWithGeminiRetry(prompt)
+        modelName = 'Google Gemini (Nano Banana / Imagen 3)'
+      } else {
+        imagePath = await generateImageWithRetry(prompt)
+        modelName = 'Stable Diffusion XL'
+      }
       
       if (!imagePath) {
         throw new Error('Failed to generate image after retries')
@@ -49,7 +80,7 @@ export class ImageAdapter implements Adapter {
       let response = 
         `**Done!**\n\n` +
         `Prompt: "${prompt}"\n\n` +
-        `Generated with: Stable Diffusion XL • ${(processingTime / 1000).toFixed(1)}s`
+        `Generated with: ${modelName} • ${(processingTime / 1000).toFixed(1)}s`
       
       // Post-processing: Translate back to original language if needed
       const targetLang = input.detectedLang || 'en'
@@ -72,7 +103,8 @@ export class ImageAdapter implements Adapter {
           processingTime,
           status: 'success',
           prompt,
-          model: 'stable-diffusion-xl-base-1.0'
+          provider,
+          model: provider === 'gemini' ? 'imagen-3.0' : 'stable-diffusion-xl-base-1.0'
         }
       }
     } catch (error) {

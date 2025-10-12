@@ -2,7 +2,7 @@
  * Shared configuration
  */
 
-import type { STTProvider, LLMProvider, TTSProvider } from './providers'
+import type { STTProvider, LLMProvider, TTSProvider, ImageProvider } from './providers'
 
 export const config = {
   // API Keys
@@ -12,7 +12,9 @@ export const config = {
   elevenlabsApiKey: process.env.ELEVENLABS_API_KEY || '',
   linkupApiKey: process.env.LINKUP_API_KEY || '',
   huggingfaceApiKey: process.env.HUGGINGFACE_API_KEY || '',
+  geminiApiKey: process.env.GEMINI_API_KEY || '',
   lingoApiKey: process.env.LINGODEV_API_KEY || '',
+  falApiKey: process.env.FAL_API_KEY || '',
   
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',
   telegramAdminChatId: process.env.TELEGRAM_ADMIN_CHAT_ID || '',
@@ -43,6 +45,7 @@ export const config = {
   sttProvider: (process.env.STT_PROVIDER || 'openai') as STTProvider,
   llmProvider: (process.env.LLM_PROVIDER || 'openai') as LLMProvider,
   ttsProvider: (process.env.TTS_PROVIDER || 'openai') as TTSProvider,
+  imageProvider: (process.env.IMAGE_PROVIDER || 'huggingface') as ImageProvider,
   
   // Ports
   gatewayPort: parseInt(process.env.PORT_GATEWAY || '3020'),

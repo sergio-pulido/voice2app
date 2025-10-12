@@ -2,19 +2,11 @@
  * Main orchestrator: coordinates all packages with AI routing
  */
 
-import { logger, config } from '../shared'
+import { logger, config, type OrchestrateOptions } from '../shared'
 import { sendWhatsAppMessage } from '../shared/whatsapp'
 import { sendDiscordAdminNotification, createAdminEmbed } from '../shared/discord-admin'
 import { sendNotification, sendAcknowledgment, sendError } from '../notifier'
 import { routeRequest, getCategoryName, getCategoryEmoji, type IntentCategory } from '../router'
-
-interface OrchestrateOptions {
-  chatId: number
-  messageId: number
-  voiceBuffer?: Buffer
-  textMessage?: string
-  username?: string
-}
 
 /**
  * Send admin notification to configured channels (WhatsApp and/or Discord)
@@ -44,14 +36,16 @@ async function sendAdminNotification(message: string, embed?: any): Promise<void
 }
 
 export async function orchestrate(options: OrchestrateOptions): Promise<void> {
-  const { chatId, messageId, voiceBuffer, textMessage, username } = options
+  const { chatId, messageId, voiceBuffer, textMessage, username, platform } = options
   
   const startTime = Date.now()
-  logger.info('🚀 Starting orchestration with AI routing...')
+  logger.info(`🚀 Starting orchestration with AI routing (${platform})...`)
   
   try {
-    // Send acknowledgment to Telegram
-    await sendAcknowledgment(chatId, voiceBuffer ? 'voice' : 'text')
+    // Send acknowledgment to Telegram (only for Telegram platform)
+    if (platform === 'telegram') {
+      await sendAcknowledgment(chatId as number, voiceBuffer ? 'voice' : 'text')
+    }
     
     // Prepare input for router
     const messageType = voiceBuffer ? 'voice' : 'text'
@@ -87,13 +81,15 @@ export async function orchestrate(options: OrchestrateOptions): Promise<void> {
     // Build customer notification message (bold category name)
     let customerMessage = `**${categoryName}**\n\n${result.summaryText}`
     
-    // Send result to customer (Telegram)
-    await sendNotification({
-      chatId,
-      text: customerMessage,
-      screenshot: result.attachments?.[0], // First attachment if any
-      voice: !!voiceBuffer,  // Send voice reply if input was voice
-    })
+    // Send result to customer (Telegram only)
+    if (platform === 'telegram') {
+      await sendNotification({
+        chatId: chatId as number,
+        text: customerMessage,
+        screenshot: result.attachments?.[0], // First attachment if any
+        voice: !!voiceBuffer,  // Send voice reply if input was voice
+      })
+    }
     
     // Send detailed admin completion notification
     const processingTime = ((Date.now() - startTime) / 1000).toFixed(1)
@@ -139,8 +135,10 @@ export async function orchestrate(options: OrchestrateOptions): Promise<void> {
     const errorStack = error instanceof Error ? error.stack : undefined
     const processingTime = ((Date.now() - startTime) / 1000).toFixed(1)
     
-    // Send error to Telegram (customer)
-    await sendError(chatId, errorMessage)
+    // Send error to Telegram (customer, only for Telegram platform)
+    if (platform === 'telegram') {
+      await sendError(chatId as number, errorMessage)
+    }
     
     // Send detailed error notification to WhatsApp (admin)
     await sendAdminNotification(
