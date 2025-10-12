@@ -63,9 +63,14 @@ export async function sendNotification(payload: NotificationPayload): Promise<bo
       await sendMessage(payload.chatId, payload.text)
     }
     
-    // Send screenshot if provided
+    // Send screenshot or video if provided
     if (payload.screenshot) {
-      await sendPhoto(payload.chatId, payload.screenshot)
+      // Check if it's a video file
+      if (payload.screenshot.endsWith('.mp4') || payload.screenshot.endsWith('.webm')) {
+        await sendVideo(payload.chatId, payload.screenshot)
+      } else {
+        await sendPhoto(payload.chatId, payload.screenshot)
+      }
     }
     
     logger.success('Notification sent successfully')
@@ -152,6 +157,41 @@ async function sendPhoto(chatId: number, photoPath: string): Promise<void> {
   } catch (error) {
     logger.error('Failed to send photo:', error)
     // Don't throw - continue even if photo fails
+  }
+}
+
+async function sendVideo(chatId: number, videoPath: string): Promise<void> {
+  const url = `${TELEGRAM_API_BASE}${config.telegramBotToken}/sendVideo`
+  
+  try {
+    // Read video file
+    const videoBuffer = await readFile(videoPath)
+    
+    // Create form data
+    const formData = new FormData()
+    formData.append('chat_id', chatId.toString())
+    
+    // Determine MIME type based on file extension
+    const mimeType = videoPath.endsWith('.mp4') ? 'video/mp4' : 'video/webm'
+    const filename = videoPath.endsWith('.mp4') ? 'interaction.mp4' : 'interaction.webm'
+    
+    formData.append('video', new Blob([videoBuffer], { type: mimeType }), filename)
+    formData.append('caption', '🎥 Video of your app interaction')
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      body: formData,
+    })
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Telegram API error (${response.status}): ${errorText}`)
+    }
+    
+    logger.debug('Video sent successfully')
+  } catch (error) {
+    logger.error('Failed to send video:', error)
+    // Don't throw - continue even if video fails
   }
 }
 

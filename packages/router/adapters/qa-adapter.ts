@@ -120,7 +120,18 @@ export class QAAdapter implements Adapter {
       } else if (errorMessage.includes('401') || errorMessage.includes('403')) {
         userMessage += '🔑 API authentication error. Please check your API keys in the .env file.'
       } else if (errorMessage.includes('429')) {
-        userMessage += '⏱️  Rate limit reached. Please wait a moment and try again.'
+        userMessage += '⏱️  Rate limit reached. Please wait a moment and try again.\n\n'
+        
+        // Provide a simple fallback for common hackathon questions
+        if (input.text.toLowerCase().includes('hackathon') && input.text.toLowerCase().includes('app')) {
+          userMessage += '📱 Here are some quick hackathon app ideas:\n\n'
+          userMessage += '🎮 **Games**: Snake, Tetris, Pong, Tic-Tac-Toe, Rock Paper Scissors\n'
+          userMessage += '🧮 **Utilities**: Calculator, Timer, Weather App, Todo List\n'
+          userMessage += '💬 **Interactive**: Chatbot, Quiz App, Voting App\n'
+          userMessage += '📊 **Data**: Simple Dashboard, Chart Generator\n'
+          userMessage += '🎨 **Creative**: Drawing App, Color Picker, Meme Generator\n\n'
+          userMessage += '💡 Try saying "Create a [specific app]" to build one!'
+        }
       } else {
         userMessage += `Error: ${errorMessage}\n\nPlease try again or rephrase your question.`
       }

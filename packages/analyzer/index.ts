@@ -4,6 +4,8 @@
 
 import { config, logger, type Task, type RunnerResult, type AnalysisResult } from '../shared'
 import { createLLMProvider } from '../codegen/providers'
+import { readFile } from 'fs/promises'
+import { join } from 'path'
 
 const ANALYSIS_SYSTEM_PROMPT = `You are an expert code reviewer and UX analyst.
 Analyze the results of a code generation and execution task, then provide:
@@ -20,26 +22,22 @@ export async function analyzeResults(
   logger.job(task.jobId, 'Analyzing results...')
   
   try {
-    // Check which requirements were met
-    const checksCompleted: string[] = []
-    const checksFailed: string[] = []
+    // Check which requirements were met by analyzing the generated code
+    const { checksCompleted, checksFailed } = await analyzeGeneratedCode(task, runnerResult)
     
-    // Simple check: if we have a screenshot, assume visual checks passed
-    // In a real implementation, you'd use computer vision or DOM inspection
-    if (runnerResult.success && runnerResult.screenshot) {
-      checksCompleted.push(...task.checks)
-    } else {
-      checksFailed.push(...task.checks)
-    }
-    
-    // Determine status
+    // Determine status based on both build success and feature implementation
     let status: 'success' | 'partial' | 'failed'
-    if (runnerResult.success && runnerResult.screenshot) {
+    
+    if (!runnerResult.success) {
+      status = 'failed'
+    } else if (checksCompleted.length === task.checks.length) {
+      // All required features implemented
       status = 'success'
-    } else if (runnerResult.success && !runnerResult.screenshot) {
-      // App ran but no screenshot - could be because screenshot wasn't requested
-      status = task.artifact.screenshot ? 'partial' : 'success'
+    } else if (checksCompleted.length > 0) {
+      // Some features implemented
+      status = 'partial'
     } else {
+      // No features implemented despite successful build
       status = 'failed'
     }
     
@@ -71,6 +69,106 @@ export async function analyzeResults(
   }
 }
 
+async function analyzeGeneratedCode(
+  task: Task,
+  runnerResult: RunnerResult
+): Promise<{ checksCompleted: string[]; checksFailed: string[] }> {
+  const checksCompleted: string[] = []
+  const checksFailed: string[] = []
+  
+  // If the app didn't build successfully, all checks fail
+  if (!runnerResult.success) {
+    checksFailed.push(...task.checks)
+    return { checksCompleted, checksFailed }
+  }
+  
+  try {
+    // Read the generated App.tsx file to analyze implementation
+    const appPath = join(process.cwd(), runnerResult.sandboxPath || `sandbox/${task.jobId}`, 'src', 'App.tsx')
+    let appCode = ''
+    
+    try {
+      appCode = await readFile(appPath, 'utf-8')
+    } catch (error) {
+      logger.warn(`Could not read App.tsx for analysis: ${error.message}`)
+      // If we can't read the code, assume basic implementation
+      checksCompleted.push(...task.checks)
+      return { checksCompleted, checksFailed }
+    }
+    
+    // Use AI to analyze if the generated code implements the required features
+    const llm = createLLMProvider()
+    
+    const analysisPrompt = `Analyze this React app code to determine which features are implemented:
+
+REQUIRED FEATURES (from task):
+${task.checks.map(check => `- ${check}`).join('\n')}
+
+GENERATED CODE:
+\`\`\`tsx
+${appCode}
+\`\`\`
+
+For each required feature, respond with either "IMPLEMENTED" or "NOT_IMPLEMENTED" followed by a brief explanation.
+
+Format your response as:
+FEATURE_NAME: IMPLEMENTED/NOT_IMPLEMENTED - explanation
+
+Be strict in your analysis. A feature is only IMPLEMENTED if it's actually functional, not just mentioned in comments or placeholders.`
+
+    const response = await llm.complete({
+      messages: [
+        { role: 'system', content: 'You are an expert code reviewer. Analyze React code to determine if specific features are actually implemented and functional.' },
+        { role: 'user', content: analysisPrompt }
+      ],
+      temperature: 0.3,
+      maxTokens: 500
+    })
+    
+    const analysis = response.content || ''
+    
+    // Parse the analysis results - look for explicit IMPLEMENTED/NOT_IMPLEMENTED markers
+    for (const check of task.checks) {
+      const checkLower = check.toLowerCase().replace(/\s+/g, '_')
+      const analysisLower = analysis.toLowerCase()
+      
+      // Look for explicit IMPLEMENTED/NOT_IMPLEMENTED markers in the analysis
+      const implementedPattern = new RegExp(`\\*\\*${checkLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\*\\*:\\s*implemented`, 'i')
+      const notImplementedPattern = new RegExp(`\\*\\*${checkLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\*\\*:\\s*not_implemented`, 'i')
+      
+      if (implementedPattern.test(analysisLower)) {
+        checksCompleted.push(check)
+      } else if (notImplementedPattern.test(analysisLower)) {
+        checksFailed.push(check)
+      } else {
+        // Fallback: if the AI says "all required features are implemented" or all checks show "IMPLEMENTED", mark all as completed
+        if (analysisLower.includes('all required features are implemented') || 
+            analysisLower.includes('all the required features are implemented') ||
+            (analysisLower.includes('implemented') && !analysisLower.includes('not_implemented'))) {
+          checksCompleted.push(check)
+        } else {
+          // Default to failed if we can't determine
+          checksFailed.push(check)
+        }
+      }
+    }
+    
+    logger.info(`Code analysis results: ${checksCompleted.length} completed, ${checksFailed.length} failed`)
+    logger.debug(`Analysis response: ${analysis}`)
+    
+  } catch (error) {
+    logger.error('Code analysis error:', error)
+    // If analysis fails, fall back to basic check
+    if (runnerResult.screenshot) {
+      checksCompleted.push(...task.checks)
+    } else {
+      checksFailed.push(...task.checks)
+    }
+  }
+  
+  return { checksCompleted, checksFailed }
+}
+
 async function generateSummary(
   task: Task,
   runnerResult: RunnerResult,
@@ -85,13 +183,13 @@ async function generateSummary(
     
     const prompt = `Task: ${task.context}
 Intent: ${task.intent}
-Success: ${runnerResult.success}
+Build Success: ${runnerResult.success}
 Has Screenshot: ${!!runnerResult.screenshot}
-Checks Completed: ${checksCompleted.join(', ') || 'none'}
-Checks Failed: ${checksFailed.join(', ') || 'none'}
+Features Implemented: ${checksCompleted.join(', ') || 'none'}
+Features Missing: ${checksFailed.join(', ') || 'none'}
 Errors: ${runnerResult.errors.join(' | ') || 'none'}
 
-Provide a concise, friendly summary (2-3 sentences) of what was accomplished or what went wrong.${errorDetails ? ' Mention the specific build error briefly.' : ''}`
+Provide a concise, honest summary (2-3 sentences) of what was actually accomplished. Be specific about which features were implemented vs missing. If no required features were implemented, clearly state this.${errorDetails ? ' Mention the specific build error briefly.' : ''}`
     
     const llm = createLLMProvider()
     

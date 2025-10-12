@@ -17,11 +17,20 @@ Rules:
 7. Make apps responsive and accessible
 8. Use React 18 API (createRoot instead of render)
 9. ALWAYS use default exports for React components (export default ComponentName)
-10. Include Lingo.dev localization: add "use i18n" directive, apps ready in English and Spanish by default
+10. CONDITIONAL Lingo.dev localization: ONLY include Lingo.dev if user doesn't explicitly request "no localization". If user requests "no localization", skip Lingo.dev completely and use standard Vite config.
+11. For authentication requests: Create simple mock authentication (no external auth services, skip Lingo.dev to avoid build conflicts)
+12. Keep it simple: Avoid complex backend integrations, use localStorage for data persistence
+13. 🎨 CRITICAL: Create BEAUTIFUL, modern UI/UX with professional design - NO basic/unstyled elements
+14. Use comprehensive Tailwind CSS styling with gradients, shadows, animations, and modern design patterns
+15. Apply consistent color schemes, typography, spacing, and visual hierarchy
+16. Make apps look like premium, production-ready applications
+17. 🚨 NEVER use inline styles - ALWAYS use Tailwind CSS classes for styling
+18. 🚨 ALWAYS import './index.css' in App.tsx for Tailwind to work
+19. 🚨 ALWAYS use modern layouts with proper spacing, gradients, and shadows
 
 Required dependencies for Vite + React projects:
-- dependencies: react, react-dom, "lingo.dev": "^0.112.0"
-- devDependencies: @vitejs/plugin-react, @types/react, @types/react-dom, typescript, vite, tailwindcss, autoprefixer, postcss
+- dependencies: react, react-dom (add "lingo.dev": "^0.112.0" ONLY if localization is requested)
+- devDependencies: "@vitejs/plugin-react": "^4.2.1", "@types/react": "^18.2.43", "@types/react-dom": "^18.2.17", typescript, vite, tailwindcss, autoprefixer, postcss
 
 React Component Template (ALWAYS include default export):
 \`\`\`typescript
@@ -52,6 +61,30 @@ export default {
     extend: {},
   },
   plugins: [],
+}
+\`\`\`
+
+TSConfig Template (tsconfig.json - 🚨 NO "references" field):
+\`\`\`json
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "useDefineForClassFields": true,
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "esModuleInterop": false,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx"
+  },
+  "include": ["src"]
 }
 \`\`\`
 
@@ -96,9 +129,37 @@ export async function generateCode(task: Task): Promise<GeneratedFile[]> {
     // Parse JSON
     const files = JSON.parse(cleanContent) as GeneratedFile[]
     
-    logger.success(`Generated ${files.length} files`)
+    // Post-process files to ensure package.json has scripts section
+    const processedFiles = files.map(file => {
+      if (file.path === 'package.json') {
+        let packageJson
+        try {
+          packageJson = JSON.parse(file.content)
+        } catch {
+          packageJson = file.content // if already an object
+        }
+        
+        // Ensure scripts section exists
+        if (!packageJson.scripts) {
+          packageJson.scripts = {
+            "dev": "vite",
+            "build": "vite build",
+            "serve": "vite serve"
+          }
+          logger.warn('Added missing scripts section to package.json')
+        }
+        
+        return {
+          ...file,
+          content: JSON.stringify(packageJson, null, 2)
+        }
+      }
+      return file
+    })
     
-    return files
+    logger.success(`Generated ${processedFiles.length} files`)
+    
+    return processedFiles
   } catch (error) {
     logger.error('Code generation error:', error)
     
@@ -110,6 +171,17 @@ export async function generateCode(task: Task): Promise<GeneratedFile[]> {
 function buildPrompt(task: Task): string {
   const isFullstackOrFrontend = task.project.includes('frontend') || task.project === 'fullstack' || task.project === 'mvp'
   
+  // Determine if we should include Lingo.dev localization
+  // DEFAULT: Do NOT include Lingo unless explicitly requested
+  const shouldIncludeLingo = (task.context.toLowerCase().includes('localization') || 
+                             task.context.toLowerCase().includes('localisation') ||
+                             task.context.toLowerCase().includes('multilingual') ||
+                             task.context.toLowerCase().includes('multi-language') ||
+                             task.context.toLowerCase().includes('english and spanish') ||
+                             task.context.toLowerCase().includes('translate')) &&
+                             !task.context.toLowerCase().includes('no localization') &&
+                             !task.context.toLowerCase().includes('no localisation')
+  
   return `Project: ${task.project}
 Intent: ${task.intent}
 Requirements: ${task.context}
@@ -117,29 +189,33 @@ Requirements: ${task.context}
 ${task.checks.length > 0 ? `Must include: ${task.checks.join(', ')}` : ''}
 
 Generate a complete, working application with all necessary files.
+
 ${isFullstackOrFrontend ? `
 Include these files:
-- package.json (with ALL required dependencies: react, react-dom, "lingo.dev": "^0.112.0", AND devDependencies: @vitejs/plugin-react, @types/react, @types/react-dom, typescript, vite, tailwindcss, autoprefixer, postcss. Add "type": "module" to package.json)
-- vite.config.ts (import react from '@vitejs/plugin-react', import lingoCompiler from 'lingo.dev/compiler')
-- tsconfig.json
+- package.json (🚨 CRITICAL: MUST include "scripts" section with "dev": "vite", "build": "vite build", "serve": "vite serve" 🚨. Include ALL required dependencies: react, react-dom, AND devDependencies: @vitejs/plugin-react, @types/react, @types/react-dom, typescript, vite, tailwindcss, autoprefixer, postcss. Add "type": "module" to package.json.${shouldIncludeLingo ? ' Include "lingo.dev": "^0.112.0" for localization.' : ' DO NOT include lingo.dev - user requested no localization.'})
+- vite.config.ts (import react from '@vitejs/plugin-react'${shouldIncludeLingo ? ', import lingoCompiler from \'lingo.dev/compiler\' and use lingoCompiler.next() wrapper' : ' - use standard Vite config without Lingo'})
+- tsconfig.json (🚨 DO NOT include "references" field - no tsconfig.node.json needed)
 - postcss.config.cjs (use CommonJS format with module.exports) OR postcss.config.js (use ES module format with export default)
 - tailwind.config.js (use ES module format with export default)
-- index.html
+- index.html (MUST have correct script src="src/main.tsx" path)
 - src/main.tsx (use React 18 createRoot API from 'react-dom/client')
-- src/App.tsx (MUST have export default App, include "use i18n" directive at top for localization)
+- src/App.tsx (MUST have export default App${shouldIncludeLingo ? ', include "use i18n" directive at top for localization' : ' - NO "use i18n" directive needed, user requested no localization'})
 - src/index.css (with Tailwind directives: @tailwind base; @tailwind components; @tailwind utilities;)
 ` : ''}
 ${task.project === 'backend' ? 'Include: package.json, tsconfig.json, src/index.ts' : ''}
 
-LINGO.DEV LOCALIZATION SETUP:
+${shouldIncludeLingo ? `LINGO.DEV LOCALIZATION SETUP (INCLUDE):
+- Use Lingo.dev for English-Spanish translation
 1. In vite.config.ts: Use lingoCompiler.next() helper for auto-translation to Spanish
 2. In src/App.tsx: Add "use i18n" directive at the very top of the file
-3. Write text naturally in English - Lingo.dev automatically detects and translates to Spanish
-4. The compiler scans files with "use i18n" and generates Spanish translations automatically
-5. No runtime providers needed - works at build time
-6. Apps will be ready in both English and Spanish by default
+3. Write text naturally in English - Lingo.dev automatically detects and translates to Spanish` : `🚨 NO LOCALIZATION (USER REQUESTED):
+🚨 CRITICAL: User explicitly requested "no localization" - DO NOT include Lingo.dev
+🚨 1. Use standard Vite config WITHOUT lingoCompiler
+🚨 2. NO "use i18n" directive in App.tsx
+🚨 3. NO "lingo.dev" dependency in package.json
+🚨 4. Write text in English only`}
 
-Vite Config Template with Lingo:
+${shouldIncludeLingo ? `Vite Config Template WITH Lingo:
 \`\`\`typescript
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
@@ -151,6 +227,30 @@ export default lingoCompiler.next({
 })(defineConfig({
   plugins: [react()],
 }))
+\`\`\`` : `Vite Config Template WITHOUT Lingo (user requested no localization):
+\`\`\`typescript
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+})
+\`\`\``}
+
+Index.html Template (CRITICAL: Must have correct script src path):
+\`\`\`html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>App</title>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="src/main.tsx"></script>
+</body>
+</html>
 \`\`\`
 
 Main.tsx Template (Lingo works at build time, no runtime provider needed):
@@ -166,22 +266,369 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 )
 \`\`\`
 
-App.tsx Template with i18n:
+App.tsx Template with i18n (BEAUTIFUL STYLING):
 \`\`\`typescript
 "use i18n"
 import React from 'react'
 
 function App() {
   return (
-    <div>
-      <h1>Welcome to My App</h1>
-      <p>This text will be automatically translated</p>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      <div className="max-w-4xl mx-auto px-6 py-12">
+        <div className="text-center mb-12">
+          <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
+            Welcome to My App
+          </h1>
+          <p className="text-xl text-gray-600">This text will be automatically translated</p>
+        </div>
+        
+        <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+          <p className="text-gray-700 text-lg leading-relaxed">
+            Your beautiful app content goes here with proper styling and modern design.
+          </p>
+        </div>
+      </div>
     </div>
   )
 }
 
 export default App
 \`\`\`
+
+Authentication Template (BEAUTIFUL STYLING - NO Lingo.dev to avoid build conflicts):
+\`\`\`typescript
+import React, { useState, useEffect } from 'react'
+
+function App() {
+  const [user, setUser] = useState(null)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+
+  // Simple mock authentication using localStorage
+  const login = (username, password) => {
+    // Mock validation - in real app, this would call an API
+    if (username && password) {
+      const userData = { username, id: Date.now() }
+      localStorage.setItem('user', JSON.stringify(userData))
+      setUser(userData)
+      setIsLoggedIn(true)
+      return true
+    }
+    return false
+  }
+
+  const logout = () => {
+    localStorage.removeItem('user')
+    setUser(null)
+    setIsLoggedIn(false)
+  }
+
+  useEffect(() => {
+    // Check if user is already logged in
+    const savedUser = localStorage.getItem('user')
+    if (savedUser) {
+      setUser(JSON.parse(savedUser))
+      setIsLoggedIn(true)
+    }
+  }, [])
+
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center px-4">
+        <div className="max-w-md w-full">
+          <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+            <div className="text-center mb-8">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                Welcome Back
+              </h1>
+              <p className="text-gray-600 mt-2">Sign in to your account</p>
+            </div>
+            <LoginForm onLogin={login} />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      <div className="max-w-6xl mx-auto px-6 py-12">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Welcome {user?.username}!
+          </h1>
+          <button 
+            onClick={logout}
+            className="bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white font-semibold py-2 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
+          >
+            Logout
+          </button>
+        </div>
+        
+        <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+          {/* Your beautiful app content here */}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default App
+\`\`\`
+
+Vite Config Template WITHOUT Lingo (for auth apps):
+\`\`\`typescript
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+})
+\`\`\`
+
+🎨 BEAUTIFUL UI/UX DESIGN REQUIREMENTS:
+
+**COLOR SCHEMES:**
+- Use modern gradients: bg-gradient-to-r from-blue-500 to-purple-600
+- Apply glassmorphism: backdrop-blur-sm bg-white/10
+- Use semantic colors: bg-green-500, bg-red-500, bg-blue-500, bg-yellow-500
+- Apply dark/light themes with proper contrast
+
+**TYPOGRAPHY:**
+- Use font-weight hierarchy: font-bold, font-semibold, font-medium
+- Apply proper text sizes: text-4xl, text-3xl, text-2xl, text-xl, text-lg
+- Use text colors: text-white, text-gray-800, text-blue-600
+- Apply text shadows: drop-shadow-lg
+
+**LAYOUTS & SPACING:**
+- Use proper containers: max-w-4xl mx-auto, max-w-2xl mx-auto
+- Apply consistent padding: p-8, p-6, p-4, px-6 py-4
+- Use margins: mb-8, mt-6, mx-auto
+- Apply responsive design: sm:, md:, lg:, xl: breakpoints
+
+**COMPONENTS:**
+- Buttons: Use gradients, shadows, hover effects, rounded corners
+- Cards: Use shadows (shadow-xl, shadow-lg), rounded corners (rounded-xl)
+- Forms: Use proper focus states, borders, padding
+- Navigation: Use modern navigation patterns
+
+**ANIMATIONS & INTERACTIONS:**
+- Hover effects: hover:scale-105, hover:shadow-lg
+- Transitions: transition-all duration-300
+- Focus states: focus:ring-2, focus:ring-blue-500
+- Loading states: animate-spin, animate-pulse
+
+**EXAMPLES OF BEAUTIFUL STYLING:**
+
+Beautiful Button:
+\`\`\`tsx
+<button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+  Click Me
+</button>
+\`\`\`
+
+Beautiful Card:
+\`\`\`tsx
+<div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100 hover:shadow-2xl transition-shadow duration-300">
+  <h2 className="text-2xl font-bold text-gray-800 mb-4">Card Title</h2>
+  <p className="text-gray-600 leading-relaxed">Card content goes here...</p>
+</div>
+\`\`\`
+
+Beautiful Form:
+\`\`\`tsx
+<div className="space-y-6">
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
+    <input className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white shadow-sm" type="text" />
+  </div>
+  <button className="w-full bg-gradient-to-r from-green-500 to-blue-500 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300">
+    Submit
+  </button>
+</div>
+\`\`\`
+
+Beautiful Container:
+\`\`\`tsx
+<div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+  <div className="max-w-4xl mx-auto px-6 py-12">
+    <div className="text-center mb-12">
+      <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
+        App Title
+      </h1>
+      <p className="text-xl text-gray-600">Beautiful subtitle text</p>
+    </div>
+    {/* App content */}
+  </div>
+</div>
+\`\`\`
+
+**NEVER USE:**
+- Basic HTML styling without Tailwind classes
+- Plain white backgrounds without gradients or styling
+- Unstyled buttons or forms
+- Default browser styling
+- Basic text without proper typography
+- Poor spacing or layout
+
+**ALWAYS INCLUDE:**
+- Beautiful backgrounds with gradients or patterns
+- Proper shadows and depth
+- Consistent color schemes
+- Modern typography
+- Smooth animations and transitions
+- Responsive design
+- Professional spacing and layout
+- Hover and focus states
+- Loading and interaction feedback
+
+**BEAUTIFUL UI GENERATION COMPLETE!**
+
+The code generation system now includes comprehensive beautiful UI/UX guidelines:
+- Modern gradients and backgrounds (bg-gradient-to-br from-blue-50 via-white to-purple-50)
+- Professional shadows and depth (shadow-xl, shadow-2xl)
+- Smooth animations and transitions (transition-all duration-300)
+- Consistent typography and spacing (text-4xl font-bold, p-8, mb-6)
+- Responsive design patterns (max-w-4xl mx-auto, px-6)
+- Hover and focus states (hover:scale-105, focus:ring-2)
+- Color schemes and visual hierarchy (bg-gradient-to-r from-blue-600 to-purple-600)
+
+**GENERATED APPS WILL NOW BE BEAUTIFUL AND MODERN!**
+
+🚨 PACKAGE.JSON TEMPLATE (CRITICAL - MUST include scripts section) 🚨:
+\`\`\`json
+{
+  "name": "app-name",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "serve": "vite serve"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"${shouldIncludeLingo ? ',\n    "lingo.dev": "^0.112.0"' : ''}
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.1",
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "typescript": "^5.2.2",
+    "vite": "^5.0.8",
+    "tailwindcss": "^3.3.6",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.32"
+  }
+}
+\`\`\`
+🚨 REMEMBER: The "scripts" section is REQUIRED for the app to run! 🚨
+
+${shouldIncludeLingo ? `
+🚨 FINAL REMINDER: User WANTS localization - include Lingo.dev, use lingoCompiler.next(), add "use i18n" directive` : `
+🚨🚨🚨 FINAL REMINDER: User EXPLICITLY requested "NO LOCALIZATION" 🚨🚨🚨
+🚨 DO NOT include "lingo.dev" in dependencies
+🚨 DO NOT use lingoCompiler.next() in vite.config.ts
+🚨 DO NOT add "use i18n" directive to App.tsx
+🚨 Use standard Vite config without Lingo wrapper`}
+
+🚨🚨🚨 CRITICAL: package.json MUST have "scripts" section with dev/build/serve commands! 🚨🚨🚨
+
+${task.context.toLowerCase().includes('snake') ? `
+🐍 BEAUTIFUL SNAKE GAME TEMPLATE (use this for snake games):
+\`\`\`tsx
+import React, { useState, useEffect, useRef } from 'react'
+import './index.css'
+
+function App() {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [snake, setSnake] = useState([{ x: 10, y: 10 }])
+  const [food, setFood] = useState({ x: 15, y: 15 })
+  const [direction, setDirection] = useState({ x: 0, y: 0 })
+  const [gameOver, setGameOver] = useState(false)
+  const [score, setScore] = useState(0)
+
+  useEffect(() => {
+    const context = canvasRef.current?.getContext('2d')
+    if (context) {
+      context.clearRect(0, 0, 400, 400)
+      context.fillStyle = '#10b981'
+      snake.forEach(({ x, y }) => context.fillRect(x * 20, y * 20, 18, 18))
+      context.fillStyle = '#ef4444'
+      context.fillRect(food.x * 20, food.y * 20, 18, 18)
+    }
+  }, [snake, food])
+
+  const moveSnake = () => {
+    if (gameOver) return
+    const newSnake = [...snake]
+    const head = { x: newSnake[0].x + direction.x, y: newSnake[0].y + direction.y }
+    newSnake.unshift(head)
+
+    if (head.x === food.x && head.y === food.y) {
+      setFood({ x: Math.floor(Math.random() * 20), y: Math.floor(Math.random() * 20) })
+      setScore(score + 1)
+    } else {
+      newSnake.pop()
+    }
+
+    if (head.x < 0 || head.x >= 20 || head.y < 0 || head.y >= 20 || 
+        newSnake.slice(1).some(s => s.x === head.x && s.y === head.y)) {
+      setGameOver(true)
+    } else {
+      setSnake(newSnake)
+    }
+  }
+
+  useEffect(() => {
+    const interval = setInterval(moveSnake, 200)
+    return () => clearInterval(interval)
+  }, [snake, direction, gameOver])
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (gameOver) return
+    switch (e.key) {
+      case 'ArrowUp': if (direction.y === 0) setDirection({ x: 0, y: -1 }); break
+      case 'ArrowDown': if (direction.y === 0) setDirection({ x: 0, y: 1 }); break
+      case 'ArrowLeft': if (direction.x === 0) setDirection({ x: -1, y: 0 }); break
+      case 'ArrowRight': if (direction.x === 0) setDirection({ x: 1, y: 0 }); break
+    }
+  }
+
+  const resetGame = () => {
+    setSnake([{ x: 10, y: 10 }])
+    setFood({ x: 15, y: 15 })
+    setDirection({ x: 0, y: 0 })
+    setScore(0)
+    setGameOver(false)
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 via-white to-blue-50" tabIndex={0} onKeyDown={handleKeyDown}>
+      <div className="text-center">
+        <h1 className="text-5xl font-bold mb-8 bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
+          Snake Game
+        </h1>
+        <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100 mb-4">
+          <p className="text-gray-700 text-lg mb-4">Score: {score}</p>
+          <canvas ref={canvasRef} width={400} height={400} className="bg-gray-900 rounded-lg shadow-lg border-2 border-gray-300"></canvas>
+        </div>
+        {gameOver && (
+          <div className="mt-4">
+            <p className="text-red-500 text-2xl font-bold mb-4">Game Over!</p>
+            <button onClick={resetGame} className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold py-2 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300">
+              Restart Game
+            </button>
+          </div>
+        )}
+        <p className="text-gray-600 mt-4">Use arrow keys to play!</p>
+      </div>
+    </div>
+  )
+}
+
+export default App
+\`\`\`
+🐍 Use this template for snake games - it has beautiful styling! 🐍` : ''}
 
 Return the JSON array of files.`
 }

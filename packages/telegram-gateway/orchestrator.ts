@@ -86,7 +86,7 @@ export async function orchestrate(options: OrchestrateOptions): Promise<void> {
       await sendNotification({
         chatId: chatId as number,
         text: customerMessage,
-        screenshot: result.attachments?.[0], // First attachment if any
+        screenshot: result.attachments?.[0], // First attachment (image or video)
         voice: !!voiceBuffer,  // Send voice response if input was voice
       })
     }

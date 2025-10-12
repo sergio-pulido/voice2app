@@ -55,7 +55,7 @@ export const config = {
   artifactsRoot: './artifacts',
   
   // Model Settings
-  llmModel: process.env.LLM_MODEL || 'gpt-4o-mini',
+  llmModel: process.env.LLM_MODEL || 'gpt-4o',
   llmTemperature: parseFloat(process.env.LLM_TEMPERATURE || '0.7'),
   imageModel: process.env.IMAGE_MODEL || 'playgroundai/playground-v2.5-1024px-aesthetic',
   
