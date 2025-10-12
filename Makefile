@@ -1,14 +1,15 @@
-.PHONY: help dev server tunnels tunnel-telegram tunnel-vonage setup-webhook clean kill-server kill-tunnels kill-all logs
+.PHONY: help dev server tunnels tunnel-telegram tunnel-vonage tunnel-discord setup-webhook clean kill-server kill-tunnels kill-all logs
 
 # Default target
 help:
 	@echo "📱 Voice2App - Development Commands"
 	@echo ""
 	@echo "Usage:"
-	@echo "  make dev              - Start server and both Hookdeck tunnels"
+	@echo "  make dev              - Start server and all Hookdeck tunnels"
 	@echo "  make server           - Start the server only"
-	@echo "  make tunnels          - Start both Hookdeck tunnels"
+	@echo "  make tunnels          - Start all Hookdeck tunnels (Telegram, Discord, Vonage)"
 	@echo "  make tunnel-telegram  - Start Telegram tunnel only"
+	@echo "  make tunnel-discord   - Start Discord tunnel only"
 	@echo "  make tunnel-vonage    - Start Vonage tunnel only"
 	@echo "  make setup-webhook    - Configure Telegram webhook with current Hookdeck URL"
 	@echo "  make logs             - Show server logs"
@@ -45,7 +46,7 @@ server:
 	@make kill-server 2>/dev/null || true
 	@bun run server.ts
 
-# Start both tunnels
+# Start all tunnels
 tunnels:
 	@echo "🔧 Starting Hookdeck tunnels..."
 	@make kill-tunnels 2>/dev/null || true
@@ -56,13 +57,18 @@ tunnels:
 	@sleep 2
 	@echo "   ✅ Telegram tunnel started"
 	@echo ""
+	@echo "   🔌 Starting Discord tunnel..."
+	@hookdeck listen 3020 discord-bot > logs/discord-tunnel.log 2>&1 &
+	@sleep 2
+	@echo "   ✅ Discord tunnel started"
+	@echo ""
 	@echo "   🔌 Starting Vonage tunnel..."
 	@hookdeck listen 3020 vonage-whatsapp --path /vonage > logs/vonage-tunnel.log 2>&1 &
 	@sleep 2
 	@echo "   ✅ Vonage tunnel started"
 	@echo ""
 	@echo "📡 Hookdeck URLs:"
-	@grep -h "URL:" logs/telegram-tunnel.log logs/vonage-tunnel.log 2>/dev/null || echo "   ⚠️  URLs not yet available, check log files"
+	@grep -h "URL:" logs/telegram-tunnel.log logs/discord-tunnel.log logs/vonage-tunnel.log 2>/dev/null || echo "   ⚠️  URLs not yet available, check log files"
 	@echo "   • Dashboard: https://dashboard.hookdeck.com/"
 	@echo ""
 
@@ -71,6 +77,12 @@ tunnel-telegram:
 	@echo "🔌 Starting Telegram tunnel..."
 	@pkill -f "hookdeck listen.*telegram-bot" 2>/dev/null || true
 	@hookdeck listen 3020 telegram-bot --path /telegram
+
+# Start Discord tunnel only
+tunnel-discord:
+	@echo "🔌 Starting Discord tunnel..."
+	@pkill -f "hookdeck listen.*discord-bot" 2>/dev/null || true
+	@hookdeck listen 3020 discord-bot
 
 # Start Vonage tunnel only
 tunnel-vonage:
@@ -100,6 +112,7 @@ kill-server:
 kill-tunnels:
 	@echo "🛑 Stopping Hookdeck tunnels..."
 	@pkill -f "hookdeck listen.*telegram-bot" 2>/dev/null || true
+	@pkill -f "hookdeck listen.*discord-bot" 2>/dev/null || true
 	@pkill -f "hookdeck listen.*vonage-whatsapp" 2>/dev/null || true
 	@echo "   ✅ Tunnels stopped"
 
@@ -111,7 +124,7 @@ kill-all: kill-server kill-tunnels
 # Clean up everything
 clean: kill-all
 	@echo "🧹 Cleaning up..."
-	@rm -f logs/server.log logs/telegram-tunnel.log logs/vonage-tunnel.log
+	@rm -f logs/server.log logs/telegram-tunnel.log logs/discord-tunnel.log logs/vonage-tunnel.log
 	@echo "   ✅ Log files removed"
 	@echo ""
 	@echo "✨ Clean complete!"

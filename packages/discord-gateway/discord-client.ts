@@ -159,7 +159,7 @@ export async function editInteractionResponse(
 }
 
 /**
- * Verify Discord request signature
+ * Verify Discord request signature using Ed25519
  */
 export function verifyDiscordRequest(
   signature: string,
@@ -167,7 +167,7 @@ export function verifyDiscordRequest(
   body: string
 ): boolean {
   try {
-    const crypto = require('crypto')
+    const nacl = require('tweetnacl')
     const publicKey = config.discordPublicKey
     
     if (!publicKey) {
@@ -175,19 +175,19 @@ export function verifyDiscordRequest(
       return false
     }
     
-    // Create signature from timestamp + body
-    const message = timestamp + body
+    // Create message from timestamp + body (as per Discord spec)
+    const message = Buffer.from(timestamp + body)
     
-    // Verify using Ed25519
-    const isValid = crypto.verify(
-      null,
-      Buffer.from(message),
-      {
-        key: Buffer.from(publicKey, 'hex'),
-        format: 'raw',
-      },
-      Buffer.from(signature, 'hex')
-    )
+    // Convert hex strings to Uint8Array
+    const sig = Uint8Array.from(Buffer.from(signature, 'hex'))
+    const pub = Uint8Array.from(Buffer.from(publicKey, 'hex'))
+    
+    // Verify using Ed25519 (tweetnacl)
+    const isValid = nacl.sign.detached.verify(message, sig, pub)
+    
+    if (!isValid) {
+      logger.warn('Invalid Discord signature')
+    }
     
     return isValid
   } catch (error) {
