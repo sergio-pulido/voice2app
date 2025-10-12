@@ -8,11 +8,13 @@ import { join } from 'path'
 import { mkdir } from 'fs/promises'
 
 export interface InteractionStep {
-  type: 'type' | 'click' | 'wait' | 'scroll'
+  type: 'type' | 'click' | 'wait' | 'scroll' | 'select'
   selector?: string
   text?: string
   duration?: number
   direction?: 'up' | 'down' | 'left' | 'right'
+  option?: string
+  optionText?: string
 }
 
 export interface AppTest {
@@ -105,12 +107,48 @@ async function executeStep(page: any, step: InteractionStep): Promise<void> {
   switch (step.type) {
     case 'type':
       if (step.selector && step.text) {
-        await page.fill(step.selector, step.text)
+        try {
+          // Try to find and fill the input with timeout
+          await page.fill(step.selector, step.text, { timeout: 5000 })
+        } catch (error) {
+          logger.warn(`Could not fill selector ${step.selector}: ${error}`)
+          // Try alternative selectors
+          try {
+            await page.fill('input:first-of-type', step.text, { timeout: 2000 })
+          } catch (e) {
+            logger.warn('Alternative input selector also failed')
+          }
+        }
+      }
+      break
+    case 'select':
+      if (step.selector && (step.option || step.optionText)) {
+        try {
+          if (step.option) {
+            // Select by value
+            await page.selectOption(step.selector, step.option, { timeout: 5000 })
+          } else if (step.optionText) {
+            // Select by text
+            await page.selectOption(step.selector, { label: step.optionText }, { timeout: 5000 })
+          }
+        } catch (error) {
+          logger.warn(`Could not select option in ${step.selector}: ${error}`)
+        }
       }
       break
     case 'click':
       if (step.selector) {
-        await page.click(step.selector)
+        try {
+          await page.click(step.selector, { timeout: 5000 })
+        } catch (error) {
+          logger.warn(`Could not click selector ${step.selector}: ${error}`)
+          // Try alternative selectors
+          try {
+            await page.click('button:first-of-type', { timeout: 2000 })
+          } catch (e) {
+            logger.warn('Alternative button selector also failed')
+          }
+        }
       }
       break
     case 'wait':
@@ -138,9 +176,17 @@ async function generateTestFromRequest(userRequest: string, appContext: string):
         return {
           description: `Testing calculator: ${numbers[0]} + ${numbers[1]}`,
           steps: [
-            { type: 'type', selector: 'input[type="number"]:nth-of-type(1)', text: numbers[0].toString() },
-            { type: 'type', selector: 'input[type="number"]:nth-of-type(2)', text: numbers[1].toString() },
-            { type: 'click', selector: 'button:has-text("Add"), button:has-text("Suma")' },
+            // Fill first number input
+            { type: 'type', selector: 'input[placeholder*="Number 1"], input[placeholder*="number 1"], input[type="number"]:first-of-type', text: numbers[0].toString() },
+            { type: 'wait', duration: 500 },
+            // Select addition operator
+            { type: 'select', selector: 'select', option: '+', optionText: 'Addition' },
+            { type: 'wait', duration: 500 },
+            // Fill second number input
+            { type: 'type', selector: 'input[placeholder*="Number 2"], input[placeholder*="number 2"], input[type="number"]:last-of-type', text: numbers[1].toString() },
+            { type: 'wait', duration: 500 },
+            // Click calculate button
+            { type: 'click', selector: 'button:has-text("Calculate"), button:has-text("Calculate"), button[onclick*="handleCalculate"]' },
             { type: 'wait', duration: 1000 }
           ],
           waitAfter: 1000

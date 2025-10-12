@@ -25,6 +25,15 @@ interface RouterInput {
 async function llmClassify(text: string): Promise<IntentResult> {
   const lowerText = text.toLowerCase()
   
+  // PRIORITY 0: Check for numbered menu choices first (1., 2., etc.)
+  if (/^\s*\d+\./.test(lowerText)) {
+    return {
+      category: 'app_interaction',
+      confidence: 0.9,
+      reasoning: 'Numbered menu choice detected (fallback)'
+    }
+  }
+  
   // PRIORITY 1: Check for commands first (generate/create/make/build)
   const hasCommandVerb = /\b(generate|create|make|build|draw|design|genera|crea|haz|dibuja)\b/i.test(lowerText)
   
@@ -172,9 +181,10 @@ async function groqClassify(text: string): Promise<IntentResult> {
    ✅ "crea una app", "haz una página"
 
 **"app_interaction"** - Testing/using/interacting with an already generated app
-   🎯 Keywords: test, use, play, click, add, subtract, calculate, interact
+   🎯 Keywords: test, use, play, click, add, subtract, calculate, interact, numbered choices (1., 2., etc.)
    ✅ "Add 2+5", "Play the game", "Test the calculator", "Click the button"
-   ✅ "suma 2+5", "juega el juego", "prueba la calculadora"
+   ✅ "1. add 3+56", "2. play the game", "suma 2+5", "juega el juego", "prueba la calculadora"
+   ✅ Any message starting with "1." or "2." after app generation is app_interaction
 
 **"translate"** - Translation between languages
    🎯 Keywords: translate, how do you say, what is X in [language]
@@ -193,6 +203,7 @@ async function groqClassify(text: string): Promise<IntentResult> {
 
 🚨 DISAMBIGUATION RULES:
 - "Generate/Create/Make/Build + [something]" → ALWAYS a command (image_gen/video_gen/app_code), NEVER friend
+- Messages starting with "1." or "2." → ALWAYS app_interaction (user choosing from menu)
 - "Hello" alone → friend
 - "Hello, generate a video" → video_gen (command takes priority)
 - "How are you?" alone → friend

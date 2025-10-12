@@ -3,6 +3,10 @@ import telegramGateway from './packages/telegram-gateway'
 import discordGateway from './packages/discord-gateway'
 import { logger } from './packages/shared'
 
+// Load environment variables from .env file
+import { config } from 'dotenv'
+config()
+
 const PORT = 3020
 
 // Create main app and mount both gateways

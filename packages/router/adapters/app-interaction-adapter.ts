@@ -34,7 +34,14 @@ export class AppInteractionAdapter implements Adapter {
       
       const { appUrl, appContext, jobId, sandboxPath } = session
       
-      logger.info(`Testing app with request: ${input.text}`)
+      // Clean up numbered requests (e.g., "1. add 3+56" → "add 3+56")
+      let cleanRequest = input.text || ''
+      if (/^\s*\d+\.\s*/.test(cleanRequest)) {
+        cleanRequest = cleanRequest.replace(/^\s*\d+\.\s*/, '')
+        logger.info(`Cleaned request: "${input.text}" → "${cleanRequest}"`)
+      }
+      
+      logger.info(`Testing app with request: ${cleanRequest}`)
       
       // Start server if needed (the URL might be stale)
       let workingUrl = appUrl
@@ -68,7 +75,7 @@ export class AppInteractionAdapter implements Adapter {
       const screenshotPath = await testAppWithInteraction(
         workingUrl,
         jobId,
-        input.text || '',
+        cleanRequest,
         appContext
       )
       
@@ -84,10 +91,10 @@ export class AppInteractionAdapter implements Adapter {
       }
       
       const message = `🎮 App Test Complete!\n\n` +
-        `✅ Successfully tested: "${input.text}"\n\n` +
+        `✅ Successfully tested: "${cleanRequest}"\n\n` +
         `Here's what happened:\n` +
         `• App: ${appContext}\n` +
-        `• Action: ${input.text}\n` +
+        `• Action: ${cleanRequest}\n` +
         `• Result: See screenshot below! 📸\n\n` +
         `Want to test something else? Just ask! 🚀`
       
