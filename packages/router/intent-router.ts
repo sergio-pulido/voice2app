@@ -19,195 +19,63 @@ interface RouterInput {
 }
 
 /**
- * Fast keyword-based classification
- */
-function fastClassify(text: string): IntentResult | null {
-  const lowerText = text.toLowerCase()
-  
-  // Check for explanation/Q&A patterns FIRST (to avoid false positives)
-  const qaSpecificPatterns = [
-    'what is', 'qué es', 'cual es', 'which is',
-    'explain', 'explica', 'what does', 'qué significa',
-    'how does', 'cómo funciona', 'tell me about', 'dime sobre'
-  ]
-  
-  for (const pattern of qaSpecificPatterns) {
-    if (lowerText.includes(pattern)) {
-      return { category: 'qa', confidence: 0.9 }
-    }
-  }
-  
-  // App/Code generation keywords
-  const appKeywords = [
-    'create app', 'build app', 'make app', 'genera app',
-    'create page', 'build page', 'make page', 'genera página',
-    'create website', 'build website', 'make website',
-    'todo app', 'counter app', 'landing page',
-    'create component', 'build component', 'make component',
-    'crea una app', 'haz una app', 'construye',
-    'hacer una página', 'crear página'
-  ]
-  
-  // Image generation keywords (be very specific to avoid false positives)
-  const imageKeywords = [
-    'generate image', 'create image', 'make image',
-    'generate a logo', 'create a logo', 'make a logo', 'design a logo',
-    'generate illustration', 'create illustration',
-    'crea imagen', 'genera imagen', 'diseña imagen',
-    'draw a', 'dibuja un', 'dibuja una'
-  ]
-  
-  // Video generation keywords
-  const videoKeywords = [
-    'create video', 'generate video', 'make video',
-    'crea video', 'genera video', 'haz video',
-    'vídeo corto', 'short video', 'clip'
-  ]
-  
-  // Help keywords (check FIRST to avoid false positives)
-  const helpKeywords = [
-    'what can you do', 'what do you do', 'qué puedes hacer',
-    'help', 'ayuda', 'ajuda', 'capabilities', 'capacidades',
-    'how to use', 'cómo usar', 'how does this work',
-    'what are your features', 'what features', 'qué características',
-    'show me what you can do', 'muéstrame qué puedes hacer'
-  ]
-  
-  for (const keyword of helpKeywords) {
-    if (lowerText.includes(keyword)) {
-      return { category: 'help', confidence: 0.95 }
-    }
-  }
-  
-  // Friend/Chat keywords (conversational, casual interactions)
-  const friendKeywords = [
-    'hello', 'hi', 'hey', 'hola', 'good morning', 'buenos días',
-    'good afternoon', 'buenas tardes', 'good evening', 'buenas noches',
-    'how are you', 'how r u', 'cómo estás', 'qué tal',
-    'how are you doing', 'how are you feeling', 'cómo te sientes',
-    'what\'s up', 'wassup', 'qué pasa', 'qué onda',
-    'nice to meet', 'encantado', 'mucho gusto',
-    'good night', 'see you', 'hasta luego', 'adiós',
-    'thank you', 'thanks', 'gracias', 'thx',
-    'i\'m happy', 'i\'m sad', 'i\'m tired', 'i\'m excited',
-    'tell me a joke', 'make me laugh', 'cuéntame un chiste',
-    'you\'re funny', 'you\'re cool', 'eres gracioso'
-  ]
-  
-  for (const keyword of friendKeywords) {
-    if (lowerText.includes(keyword)) {
-      return { category: 'friend', confidence: 0.92 }
-    }
-  }
-  
-  // Translation keywords
-  const translateKeywords = [
-    'translate', 'traduce', 'tradueix', 'traduir',
-    'how do you say', 'cómo se dice', 'com es diu',
-    'what is', 'qué es', 'què és',
-    'in spanish', 'en español', 'en castellano',
-    'in french', 'en français', 'en francés',
-    'in english', 'en inglés', 'en anglès',
-    'in italian', 'en italiano',
-    'in german', 'en alemán', 'en alemany'
-  ]
-  
-  // Additional Q&A keywords (for broader matching)
-  const qaGeneralKeywords = [
-    'how to', 'cómo', 'why', 'por qué',
-    'capital', 'definition'
-  ]
-  
-  // Check for translation (high priority)
-  for (const keyword of translateKeywords) {
-    if (lowerText.includes(keyword)) {
-      return { category: 'translate', confidence: 0.9 }
-    }
-  }
-  
-  // Check for app/code generation (highest priority for this system)
-  for (const keyword of appKeywords) {
-    if (lowerText.includes(keyword)) {
-      return { category: 'app_code', confidence: 0.9 }
-    }
-  }
-  
-  // Check for image generation
-  for (const keyword of imageKeywords) {
-    if (lowerText.includes(keyword)) {
-      return { category: 'image_gen', confidence: 0.85 }
-    }
-  }
-  
-  // Check for video generation
-  for (const keyword of videoKeywords) {
-    if (lowerText.includes(keyword)) {
-      return { category: 'video_gen', confidence: 0.85 }
-    }
-  }
-  
-  // Check for general Q&A keywords
-  for (const keyword of qaGeneralKeywords) {
-    if (lowerText.includes(keyword)) {
-      return { category: 'qa', confidence: 0.8 }
-    }
-  }
-  
-  return null
-}
-
-/**
- * Keyword-based classification fallback (when Groq fails)
+ * Simple keyword-based classification fallback (ONLY used when Groq LLM fails)
+ * This is a last resort - the LLM should handle 99% of cases
  */
 async function llmClassify(text: string): Promise<IntentResult> {
   const lowerText = text.toLowerCase()
   
-  // Image generation keywords
-  const imageKeywords = [
-    'image', 'imagen', 'picture', 'photo', 'foto',
-    'generate', 'genera', 'create', 'crea',
-    'logo', 'illustration', 'ilustración',
-    'draw', 'dibuja', 'paint', 'sketch'
-  ]
+  // PRIORITY 1: Check for commands first (generate/create/make/build)
+  const hasCommandVerb = /\b(generate|create|make|build|draw|design|genera|crea|haz|dibuja)\b/i.test(lowerText)
   
-  // Check for image generation (high priority)
-  const hasImageKeyword = imageKeywords.some(kw => lowerText.includes(kw))
-  const wantsImage = lowerText.match(/\b(i want|quiero|dame|give me|generate|create).*(image|imagen|picture|logo|illustration)/i)
+  if (hasCommandVerb) {
+    // Video generation
+    if (/\b(video|clip|animation|animate|animación)\b/i.test(lowerText)) {
+      return {
+        category: 'video_gen',
+        confidence: 0.8,
+        reasoning: 'Video generation command detected (fallback)'
+      }
+    }
+    
+    // Image generation
+    if (/\b(image|imagen|picture|photo|foto|logo|illustration|ilustración|drawing)\b/i.test(lowerText)) {
+      return {
+        category: 'image_gen',
+        confidence: 0.8,
+        reasoning: 'Image generation command detected (fallback)'
+      }
+    }
+    
+    // App/code generation
+    if (/\b(app|page|website|site|component|código|página)\b/i.test(lowerText)) {
+      return {
+        category: 'app_code',
+        confidence: 0.8,
+        reasoning: 'App building command detected (fallback)'
+      }
+    }
+  }
   
-  if (hasImageKeyword || wantsImage) {
+  // PRIORITY 2: Translation
+  if (/\b(translate|traduce|tradueix|how do you say|cómo se dice)\b/i.test(lowerText)) {
     return {
-      category: 'image_gen',
+      category: 'translate',
       confidence: 0.8,
-      reasoning: 'Image generation keywords detected (fallback)'
+      reasoning: 'Translation request detected (fallback)'
     }
   }
   
-  // App building keywords
-  const appKeywords = [
-    'create app', 'build app', 'make app',
-    'create page', 'build page', 'make page',
-    'create component', 'build site', 'website',
-    'landing page', 'todo', 'counter'
-  ]
-  
-  if (appKeywords.some(kw => lowerText.includes(kw))) {
+  // PRIORITY 3: Greetings/casual (only if NO command detected)
+  if (/\b(hello|hi|hey|hola|good morning|buenos días|how are you|cómo estás)\b/i.test(lowerText)) {
     return {
-      category: 'app_code',
+      category: 'friend',
       confidence: 0.7,
-      reasoning: 'App building keywords detected (fallback)'
+      reasoning: 'Greeting detected (fallback)'
     }
   }
   
-  // Video generation keywords
-  if (lowerText.match(/\b(video|clip|animation|animate)/i)) {
-    return {
-      category: 'video_gen',
-      confidence: 0.7,
-      reasoning: 'Video keywords detected (fallback)'
-    }
-  }
-  
-  // Default to Q&A (safest option)
+  // PRIORITY 4: Default to Q&A for questions
   return {
     category: 'qa',
     confidence: 0.6,
@@ -275,32 +143,61 @@ async function groqClassify(text: string): Promise<IntentResult> {
           messages: [
             {
               role: 'system',
-              content: `You are an intent classifier. Classify the user's request into ONE of these categories:
+              content: `You are an expert intent classifier for an AI-first voice application. Analyze the user's request and classify it into ONE category.
 
-1. "help" - Asking about capabilities, features, or how to use the system
-   Examples: "What can you do?", "Help", "What are your features?", "How do I use this?"
+🎤 IMPORTANT: Input may be TRANSCRIBED VOICE - handle natural speech patterns, filler words, and slight transcription errors.
+🌍 MULTILINGUAL: Input can be in ANY language (English, Spanish, Catalan, French, etc.) - understand the intent regardless of language.
 
-2. "friend" - Casual conversation, greetings, small talk, personal interactions
-   Examples: "Hello!", "How are you?", "What's up?", "Tell me a joke", "I'm feeling happy", "Good morning", "Thanks!", "You're cool"
+⚠️ CRITICAL PRIORITY ORDER:
+1. COMMANDS (image_gen, video_gen, app_code, translate) - If user wants to CREATE/GENERATE/BUILD/MAKE something, this ALWAYS takes priority!
+2. Help requests
+3. Factual questions (qa)
+4. Casual conversation (friend) - ONLY if purely social with NO action requested
 
-3. "qa" - Questions, explanations, information requests (factual)
-   Examples: "What is X?", "Explain Y", "Tell me about Z", "How does X work?"
+📋 CATEGORIES:
 
-4. "app_code" - Building apps, websites, components, code
-   Examples: "Create a counter app", "Build a landing page", "Make a todo list"
+**"image_gen"** - Creating/generating images, logos, illustrations, drawings
+   🎯 Keywords: generate, create, make, draw, design + image/logo/picture/illustration
+   ✅ "Generate a logo", "Create an image of a cat", "Draw a sunset", "Make me a picture of X"
+   ✅ "genera una imagen", "crea un logo"
 
-5. "image_gen" - Generating images, logos, illustrations
-   Examples: "Generate a logo", "Create an image of X", "Draw a picture", "I want an image of X"
+**"video_gen"** - Creating/generating videos, clips, animations
+   🎯 Keywords: generate, create, make, build + video/clip/animation
+   ✅ "Generate a video", "Create a clip", "Make a video about X", "Build an animation"
+   ✅ "genera un video", "crea un video"
 
-6. "video_gen" - Generating videos, clips, animations
-   Examples: "Create a video", "Make a clip", "Generate video about X"
+**"app_code"** - Building apps, websites, components, pages, code
+   🎯 Keywords: create, build, make + app/website/page/component/code
+   ✅ "Create a counter app", "Build a landing page", "Make a todo list", "Build a website"
+   ✅ "crea una app", "haz una página"
 
-7. "translate" - Translation requests
-   Examples: "Translate 'Hello' to Spanish", "How do you say 'Good morning' in French?", "What is 'cat' in German?"
+**"translate"** - Translation between languages
+   🎯 Keywords: translate, how do you say, what is X in [language]
+   ✅ "Translate 'Hello' to Spanish", "How do you say 'cat' in French?", "What is 'good morning' in German?"
 
-Respond with ONLY ONE WORD: help, friend, qa, app_code, image_gen, video_gen, or translate
+**"help"** - Asking about bot capabilities, features, or how to use the system
+   ✅ "What can you do?", "Help", "What are your features?", "How do I use this?"
 
-Default to "friend" for greetings/casual talk, "qa" for factual questions.`
+**"qa"** - Factual questions, explanations, information requests (NO action requested)
+   ✅ "What is photosynthesis?", "Explain quantum computing", "How does the EU work?"
+   ❌ NOT for "How do I make X" → that's often app_code
+
+**"friend"** - PURELY casual conversation, greetings, small talk, personal chat (NO commands or questions)
+   ✅ "Hello!", "How are you?", "What's up?", "Good morning", "Thanks!", "You're cool", "I'm tired"
+   ❌ NOT if they want something created/generated/built/translated
+
+🚨 DISAMBIGUATION RULES:
+- "Generate/Create/Make/Build + [something]" → ALWAYS a command (image_gen/video_gen/app_code), NEVER friend
+- "Hello" alone → friend
+- "Hello, generate a video" → video_gen (command takes priority)
+- "How are you?" alone → friend
+- "Tell me a joke" → friend (casual entertainment, not a command)
+- "What is X?" → qa (factual question)
+- "How do I create X?" → probably app_code if about building something
+
+Respond with ONLY ONE WORD: image_gen, video_gen, app_code, translate, help, qa, or friend
+
+When in doubt between friend and a command: CHOOSE THE COMMAND.`
             },
             {
               role: 'user',
@@ -359,8 +256,8 @@ Default to "friend" for greetings/casual talk, "qa" for factual questions.`
  * Main intent detection function
  */
 export async function detectIntent(input: RouterInput): Promise<IntentResult> {
-  const textToLog = typeof input.text === 'string' ? input.text.substring(0, 50) : String(input.text).substring(0, 50)
-  logger.debug(`🧠 Detecting intent for: "${textToLog}..."`)
+  const textToLog = typeof input.text === 'string' ? input.text.substring(0, 100) : String(input.text).substring(0, 100)
+  logger.info(`🧠 Intent Router received: "${textToLog}${input.text.length > 100 ? '...' : ''}"`)
   
   // Step 1: Validate and sanitize input
   const textToValidate = typeof input.text === 'string' ? input.text : String(input.text)
@@ -377,12 +274,13 @@ export async function detectIntent(input: RouterInput): Promise<IntentResult> {
   }
   
   const cleanedText = validation.cleaned
+  logger.info(`✅ Cleaned text for Groq: "${cleanedText.substring(0, 100)}${cleanedText.length > 100 ? '...' : ''}"`)
   
   // Step 2: Use Groq for intelligent classification
-  logger.info('🤖 Using Groq for intelligent intent classification...')
+  logger.info('🤖 Sending to Groq LLM for intent classification...')
   const groqResult = await groqClassify(cleanedText)
   
-  logger.info(`🎯 Groq classified as: ${groqResult.category} (confidence: ${groqResult.confidence})`)
+  logger.success(`🎯 Groq result: ${groqResult.category} (${groqResult.confidence} confidence) - ${groqResult.reasoning}`)
   
   return groqResult
 }

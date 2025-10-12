@@ -4,7 +4,7 @@
  * https://fal.ai/models/veed/fabric-1.0
  */
 
-import * as fal from '@fal-ai/client'
+import { fal } from '@fal-ai/client'
 import { config } from '../../shared/config'
 import { logger } from '../../shared/logger'
 import { writeFile, mkdir, readFile } from 'fs/promises'
@@ -32,7 +32,7 @@ export async function generateVideoWithFabric(options: FabricVideoOptions): Prom
   try {
     const { imageUrl, audioUrl, resolution = '720p' } = options
     
-    logger.info(`🎬 Generating video with fal.ai Fabric 1.0...`)
+    logger.info(`🎬 Generating talking video with fal.ai Fabric 1.0...`)
     logger.debug(`Image: ${imageUrl.substring(0, 50)}...`)
     logger.debug(`Audio: ${audioUrl.substring(0, 50)}...`)
     logger.debug(`Resolution: ${resolution}`)
@@ -46,36 +46,41 @@ export async function generateVideoWithFabric(options: FabricVideoOptions): Prom
       credentials: config.falApiKey
     })
     
-    logger.debug('Submitting to fal.ai Fabric 1.0...')
+    logger.debug('Submitting to fal.ai Fabric 1.0 model...')
     
-    // For local files, we need to upload them first
+    // For local files, we need to upload them first to fal storage (URLs are required)
     let imageUrlToUse = imageUrl
     let audioUrlToUse = audioUrl
-    
-    // If paths are local files, read and convert to data URLs
+
     if (!imageUrl.startsWith('http')) {
-      logger.debug('Reading local image file...')
+      logger.debug('Uploading local image file to fal storage...')
       const imageBuffer = await readFile(imageUrl)
-      const base64Image = imageBuffer.toString('base64')
-      const mimeType = imageUrl.endsWith('.png') ? 'image/png' : 'image/jpeg'
-      imageUrlToUse = `data:${mimeType};base64,${base64Image}`
+      const mimeType = imageUrl.endsWith('.png') ? 'image/png'
+        : imageUrl.endsWith('.webp') ? 'image/webp'
+        : 'image/jpeg'
+      const imageBlob = new Blob([imageBuffer], { type: mimeType })
+      imageUrlToUse = await fal.storage.upload(imageBlob)
+      logger.debug(`Image uploaded to: ${imageUrlToUse}`)
     }
-    
+
     if (!audioUrl.startsWith('http')) {
-      logger.debug('Reading local audio file...')
+      logger.debug('Uploading local audio file to fal storage...')
       const audioBuffer = await readFile(audioUrl)
-      const base64Audio = audioBuffer.toString('base64')
-      const mimeType = audioUrl.endsWith('.mp3') ? 'audio/mp3' : 
-                       audioUrl.endsWith('.wav') ? 'audio/wav' : 'audio/ogg'
-      audioUrlToUse = `data:${mimeType};base64,${base64Audio}`
+      const mimeType = audioUrl.endsWith('.mp3') ? 'audio/mpeg'
+        : audioUrl.endsWith('.wav') ? 'audio/wav'
+        : 'audio/ogg'
+      const audioBlob = new Blob([audioBuffer], { type: mimeType })
+      audioUrlToUse = await fal.storage.upload(audioBlob)
+      logger.debug(`Audio uploaded to: ${audioUrlToUse}`)
     }
+
+    const falVideoModel = 'veed/fabric-1.0'  // Talking video with audio support
     
-    // Submit the job to fal.ai
-    const result = await fal.subscribe('veed/fabric-1.0', {
+    // Submit the job to fal.ai using Fabric 1.0 model (talking video)
+    const result = await fal.subscribe(falVideoModel, {
       input: {
         image_url: imageUrlToUse,
-        audio_url: audioUrlToUse,
-        resolution: resolution
+        audio_url: audioUrlToUse
       },
       logs: true,
       onQueueUpdate: (update) => {

@@ -23,16 +23,20 @@ export async function routeRequest(input: AdapterInput): Promise<AdapterOutput> 
   let transcription = input.transcription
   
   if (input.voiceBuffer && !input.transcription) {
-    logger.info('🎤 Transcribing voice message...')
+    logger.info(`🎤 Transcribing voice message (${Math.round(input.voiceBuffer.length / 1024)}KB)...`)
     try {
       const sttResult = await transcribeAudio(input.voiceBuffer)
       transcription = sttResult.text
       textToProcess = transcription || ''
-      logger.success(`✅ Transcription: "${transcription}"`)
+      logger.success(`✅ Transcription successful: "${transcription}"`)
+      logger.info(`📝 Will use transcribed text for intent detection: "${textToProcess.substring(0, 100)}${textToProcess.length > 100 ? '...' : ''}"`)
     } catch (error) {
       logger.error('❌ Voice transcription failed:', error)
       textToProcess = input.text || 'Voice message transcription failed'
     }
+  } else if (input.transcription) {
+    logger.info(`✅ Using pre-transcribed text: "${input.transcription}"`)
+    textToProcess = input.transcription
   }
   
   // Ensure textToProcess is always a string
@@ -40,7 +44,8 @@ export async function routeRequest(input: AdapterInput): Promise<AdapterOutput> 
     textToProcess = String(textToProcess)
   }
   
-  // Step: Detect intent first (using original text)
+  // Step: Detect intent first (using transcribed/original text)
+  logger.info(`🧠 Detecting intent for text: "${textToProcess.substring(0, 100)}${textToProcess.length > 100 ? '...' : ''}"`)
   const intent = await detectIntent({
     text: textToProcess,
     userId: input.userId,

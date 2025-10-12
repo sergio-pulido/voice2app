@@ -151,6 +151,11 @@ async function processMessage(chatId: number, message: any) {
       logger.info('📸 Photo detected but no active video session')
       await sendMessage(chatId, '📸 I received your photo! To create a video, please ask me to "generate a video" first.')
     }
+    // Handle document messages (like .webp files)
+    else if (message.document) {
+      logger.info('📄 Document detected but no active video session')
+      await sendMessage(chatId, '📄 I received your file! To create a video, please ask me to "generate a video" first.')
+    }
     // Handle unsupported types
     else {
       logger.info('❓ Unsupported message type')
@@ -168,7 +173,7 @@ async function handleVideoSessionMessage(chatId: number, message: any, session: 
   try {
     // State 1: Awaiting image
     if (session.state === 'awaiting_image') {
-      // User can send photo OR text description
+      // User can send photo, document, OR text description
       if (message.photo) {
         logger.info('📸 Photo received for video generation')
         
@@ -189,6 +194,49 @@ async function handleVideoSessionMessage(chatId: number, message: any, session: 
         await writeFile(imagePath, photoBuffer)
         
         logger.success(`📸 Photo saved: ${imagePath}`)
+        
+        // Update session
+        setVideoSessionImage(chatId, imagePath)
+        
+        // Ask for audio
+        await sendMessage(
+          chatId,
+          '✅ **Image received!**\n\n' +
+          '🎤 **Step 2/3:** Now please send me a **voice message** with the audio for your video.\n\n' +
+          'This will be the audio that plays in the video (e.g., narration, speech, etc.)'
+        )
+      }
+      else if (message.document) {
+        logger.info('📄 Document received for video generation')
+        
+        // Check if it's an image file
+        const mimeType = message.document.mime_type || ''
+        if (!mimeType.startsWith('image/')) {
+          await sendMessage(
+            chatId,
+            '❌ Please send an image file (JPG, PNG, WebP, etc.) or describe the image you want me to generate.'
+          )
+          return
+        }
+        
+        // Download document
+        const documentBuffer = await downloadPhotoFile(message.document.file_id)
+        
+        if (!documentBuffer) {
+          throw new Error('Failed to download document')
+        }
+        
+        // Save document to artifacts
+        const timestamp = Date.now()
+        const extension = mimeType.includes('png') ? 'png' : 
+                         mimeType.includes('webp') ? 'webp' : 'jpg'
+        const filename = `video_image_${timestamp}.${extension}`
+        const artifactsDir = join(process.cwd(), 'artifacts')
+        await mkdir(artifactsDir, { recursive: true })
+        const imagePath = join(artifactsDir, filename)
+        await writeFile(imagePath, documentBuffer)
+        
+        logger.success(`📄 Document saved: ${imagePath}`)
         
         // Update session
         setVideoSessionImage(chatId, imagePath)
@@ -266,7 +314,7 @@ async function handleVideoSessionMessage(chatId: number, message: any, session: 
         setVideoSessionAudio(chatId, audioPath)
         
         // Generate video!
-        logger.info('🎬 Starting video generation with fal.ai...')
+        logger.info('🎬 Starting talking video generation with fal.ai Fabric 1.0...')
         const videoPath = await generateVideoWithFabricRetry({
           imageUrl: session.imagePath!,
           audioUrl: audioPath,
@@ -285,7 +333,7 @@ async function handleVideoSessionMessage(chatId: number, message: any, session: 
           '🎉 **Video Generated Successfully!**\n\n' +
           `📋 Prompt: "${session.prompt}"\n\n` +
           '✅ Your talking video has been created using fal.ai Fabric 1.0!\n' +
-          '🎬 The video combines your image with your audio.\n\n' +
+          '🎬 The video combines your image with your audio for a talking effect.\n\n' +
           '📹 Sending video...'
         )
         
