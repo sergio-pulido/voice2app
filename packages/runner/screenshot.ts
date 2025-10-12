@@ -24,11 +24,25 @@ export async function captureScreenshot(url: string, jobId: string): Promise<str
     
     const page = await context.newPage()
     
-    // Navigate to URL
-    await page.goto(url, {
-      waitUntil: 'networkidle',
-      timeout: config.runnerTimeout,
-    })
+    // Wait for server to be ready by retrying connection
+    let retries = 0
+    const maxRetries = 5
+    while (retries < maxRetries) {
+      try {
+        await page.goto(url, {
+          waitUntil: 'networkidle',
+          timeout: 10000,
+        })
+        break
+      } catch (error) {
+        retries++
+        if (retries >= maxRetries) {
+          throw error
+        }
+        logger.debug(`Retry ${retries}/${maxRetries} - waiting for server...`)
+        await page.waitForTimeout(2000)
+      }
+    }
     
     // Wait a bit for rendering
     await page.waitForTimeout(config.screenshotDelay)

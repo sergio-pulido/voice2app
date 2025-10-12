@@ -10,11 +10,49 @@ const CODEGEN_SYSTEM_PROMPT = `You are an expert full-stack developer. Generate 
 Rules:
 1. Generate clean, modern, well-structured code
 2. Use best practices and follow conventions
-3. Include necessary dependencies in package.json
-4. For frontend: use modern React with TypeScript, Vite, and Tailwind CSS
+3. Include ALL necessary dependencies in package.json (including @vitejs/plugin-react for Vite projects)
+4. For frontend: use modern React 18 with TypeScript, Vite, and Tailwind CSS
 5. For backend: use Node.js/Bun with TypeScript
 6. Always include a README.md with setup instructions
 7. Make apps responsive and accessible
+8. Use React 18 API (createRoot instead of render)
+9. ALWAYS use default exports for React components (export default ComponentName)
+
+Required dependencies for Vite + React projects:
+- dependencies: react, react-dom
+- devDependencies: @vitejs/plugin-react, @types/react, @types/react-dom, typescript, vite, tailwindcss, autoprefixer, postcss
+
+React Component Template (ALWAYS include default export):
+\`\`\`typescript
+import React from 'react'
+
+function App() {
+  return <div>Content</div>
+}
+
+export default App
+\`\`\`
+
+PostCSS Config Template (postcss.config.js):
+\`\`\`javascript
+export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}
+\`\`\`
+
+Tailwind Config Template (tailwind.config.js):
+\`\`\`javascript
+export default {
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
+\`\`\`
 
 Output format: Return a JSON array of files:
 [
@@ -69,6 +107,8 @@ export async function generateCode(task: Task): Promise<GeneratedFile[]> {
 }
 
 function buildPrompt(task: Task): string {
+  const isFullstackOrFrontend = task.project.includes('frontend') || task.project === 'fullstack' || task.project === 'mvp'
+  
   return `Project: ${task.project}
 Intent: ${task.intent}
 Requirements: ${task.context}
@@ -76,7 +116,18 @@ Requirements: ${task.context}
 ${task.checks.length > 0 ? `Must include: ${task.checks.join(', ')}` : ''}
 
 Generate a complete, working application with all necessary files.
-${task.project.includes('frontend') || task.project === 'mvp' ? 'Include: index.html, package.json, vite.config.ts, tailwind.config.js, src/main.tsx, src/App.tsx, src/index.css' : ''}
+${isFullstackOrFrontend ? `
+Include these files:
+- package.json (with ALL required dependencies: react, react-dom, AND devDependencies: @vitejs/plugin-react, @types/react, @types/react-dom, typescript, vite, tailwindcss, autoprefixer, postcss. Add "type": "module" to package.json)
+- vite.config.ts (import react from '@vitejs/plugin-react')
+- tsconfig.json
+- postcss.config.cjs (use CommonJS format with module.exports) OR postcss.config.js (use ES module format with export default)
+- tailwind.config.js (use ES module format with export default)
+- index.html
+- src/main.tsx (use React 18 createRoot API from 'react-dom/client')
+- src/App.tsx (MUST have export default App)
+- src/index.css (with Tailwind directives: @tailwind base; @tailwind components; @tailwind utilities;)
+` : ''}
 ${task.project === 'backend' ? 'Include: package.json, tsconfig.json, src/index.ts' : ''}
 
 Return the JSON array of files.`

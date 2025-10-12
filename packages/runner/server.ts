@@ -67,28 +67,53 @@ export async function serveApp(sandboxPath: string, jobId: string): Promise<Serv
       return { success: false, logs, errors }
     }
     
-    // Start dev server
+    // Start dev server with Vite
+    // Vite uses port 5173 by default, or we can configure it
     const port = 3000 + Math.floor(Math.random() * 1000)
-    const env = { ...process.env, PORT: port.toString() }
     
-    const serverProcess = spawn('bun', ['run', 'dev'], {
+    const serverProcess = spawn('bun', ['run', 'dev', '--port', port.toString(), '--host', 'localhost'], {
       cwd: sandboxPath,
-      env,
       shell: true,
     })
     
+    let serverReady = false
+    const url = `http://localhost:${port}`
+    
     serverProcess.stdout?.on('data', (data) => {
-      logs.push(data.toString())
+      const output = data.toString()
+      logs.push(output)
+      // Detect when Vite is ready
+      if (output.includes('Local:') || output.includes('localhost') || output.includes('ready in')) {
+        serverReady = true
+      }
     })
     
     serverProcess.stderr?.on('data', (data) => {
       errors.push(data.toString())
     })
     
-    // Wait for server to be ready (simple timeout)
-    await new Promise((resolve) => setTimeout(resolve, 3000))
+    // Wait for server to be ready with exponential backoff
+    const maxWaitTime = 15000 // 15 seconds max
+    const startTime = Date.now()
     
-    const url = `http://localhost:${port}`
+    while (!serverReady && (Date.now() - startTime) < maxWaitTime) {
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      
+      // Also try to connect to the port
+      try {
+        const response = await fetch(url, { signal: AbortSignal.timeout(1000) })
+        if (response.ok || response.status === 200) {
+          serverReady = true
+          break
+        }
+      } catch (e) {
+        // Server not ready yet, continue waiting
+      }
+    }
+    
+    if (!serverReady) {
+      logger.warn(`Server may not be fully ready after ${maxWaitTime}ms, proceeding anyway`)
+    }
     
     return {
       success: true,

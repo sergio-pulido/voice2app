@@ -36,8 +36,9 @@ export async function analyzeResults(
     let status: 'success' | 'partial' | 'failed'
     if (runnerResult.success && runnerResult.screenshot) {
       status = 'success'
-    } else if (runnerResult.success) {
-      status = 'partial'
+    } else if (runnerResult.success && !runnerResult.screenshot) {
+      // App ran but no screenshot - could be because screenshot wasn't requested
+      status = task.artifact.screenshot ? 'partial' : 'success'
     } else {
       status = 'failed'
     }
@@ -77,15 +78,20 @@ async function generateSummary(
   checksFailed: string[]
 ): Promise<string> {
   try {
+    // Build detailed error information
+    const errorDetails = runnerResult.errors.length > 0 
+      ? `\n\nBuild Errors:\n${runnerResult.errors.slice(0, 3).join('\n')}`
+      : ''
+    
     const prompt = `Task: ${task.context}
 Intent: ${task.intent}
 Success: ${runnerResult.success}
 Has Screenshot: ${!!runnerResult.screenshot}
 Checks Completed: ${checksCompleted.join(', ') || 'none'}
 Checks Failed: ${checksFailed.join(', ') || 'none'}
-Errors: ${runnerResult.errors.join(', ') || 'none'}
+Errors: ${runnerResult.errors.join(' | ') || 'none'}
 
-Provide a concise, friendly summary (2-3 sentences) of what was accomplished.`
+Provide a concise, friendly summary (2-3 sentences) of what was accomplished or what went wrong.${errorDetails ? ' Mention the specific build error briefly.' : ''}`
     
     const llm = createLLMProvider()
     
@@ -95,18 +101,21 @@ Provide a concise, friendly summary (2-3 sentences) of what was accomplished.`
         { role: 'user', content: prompt },
       ],
       temperature: 0.7,
-      maxTokens: 200,
+      maxTokens: 300,
     })
     
     return response.content || 'Task completed.'
   } catch (error) {
     logger.error('Summary generation error:', error)
     
-    // Fallback summary
+    // Fallback summary with error details
     if (runnerResult.success) {
       return `✅ Successfully created "${task.context}". The app is running and ready to use!`
     } else {
-      return `❌ Failed to create "${task.context}". There were some errors during the build.`
+      const errorInfo = runnerResult.errors.length > 0 
+        ? ` The build failed with error: ${runnerResult.errors[0].substring(0, 200)}`
+        : ''
+      return `❌ Failed to create "${task.context}".${errorInfo} Please try again with simpler requirements or check the build logs.`
     }
   }
 }
