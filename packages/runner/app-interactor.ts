@@ -2,7 +2,7 @@
  * App Interactor: Automates interactions with generated apps
  */
 
-import { logger } from '../shared'
+import { logger, config } from '../shared'
 import { chromium } from 'playwright'
 import { join } from 'path'
 import { mkdir } from 'fs/promises'
@@ -30,19 +30,23 @@ export async function testAppWithInteraction(
   appContext: string
 ): Promise<string | null> {
   logger.debug(`Testing app at ${url} with request: ${userRequest}`)
-  
+
   let browser: any = null
-  
+
   try {
-    // Launch browser
+    // Launch browser with video recording
     browser = await chromium.launch({
       headless: true,
     })
-    
+
     const context = await browser.newContext({
       viewport: { width: 1280, height: 720 },
+      recordVideo: {
+        dir: join(process.cwd(), config.artifactsRoot),
+        size: { width: 1280, height: 720 }
+      }
     })
-    
+
     const page = await context.newPage()
     
     // Navigate to app
@@ -74,20 +78,26 @@ export async function testAppWithInteraction(
       await page.waitForTimeout(test.waitAfter)
     }
     
-    // Capture screenshot
-    const artifactsPath = join(process.cwd(), 'artifacts')
+    // Save video of interaction
+    const artifactsPath = join(process.cwd(), config.artifactsRoot)
     await mkdir(artifactsPath, { recursive: true })
     
-    const screenshotPath = join(artifactsPath, `${jobId}_interaction.png`)
-    await page.screenshot({
-      path: screenshotPath,
-      fullPage: false,
-    })
+    const videoPath = join(artifactsPath, `${jobId}_interaction.mp4`)
+    
+    // Close page to finalize video recording
+    await page.close()
+    
+    // Get video path from page context
+    const video = page.video()
+    if (video) {
+      await video.saveAs(videoPath)
+      await video.delete()
+    }
     
     await browser.close()
     
-    logger.success(`Interaction test completed: ${screenshotPath}`)
-    return screenshotPath
+    logger.success(`🎥 Video recorded: ${videoPath}`)
+    return videoPath
   } catch (error) {
     logger.error('App interaction error:', error)
     
@@ -97,6 +107,17 @@ export async function testAppWithInteraction(
       } catch (e) {
         // Ignore
       }
+    }
+    
+    // Provide more specific error information
+    if (error.message.includes('net::ERR_CONNECTION_REFUSED')) {
+      logger.error('❌ Cannot connect to app server - it might not be running')
+    } else if (error.message.includes('Timeout')) {
+      logger.error('❌ App interaction timed out - server might be slow')
+    } else if (error.message.includes('selector')) {
+      logger.error('❌ Could not find UI elements - app interface might have changed')
+    } else {
+      logger.error('❌ Unknown interaction error:', error.message)
     }
     
     return null

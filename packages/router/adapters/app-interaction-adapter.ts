@@ -46,19 +46,41 @@ export class AppInteractionAdapter implements Adapter {
       // Start server if needed (the URL might be stale)
       let workingUrl = appUrl
       try {
-        // Try to connect to existing URL
-        const response = await fetch(appUrl, { signal: AbortSignal.timeout(2000) })
+        // Try to connect to existing URL with longer timeout
+        logger.info(`Checking if app server is running at ${appUrl}...`)
+        const response = await fetch(appUrl, { 
+          signal: AbortSignal.timeout(5000),
+          headers: { 'User-Agent': 'Voice2App-Tester' }
+        })
         if (!response.ok) {
-          throw new Error('Server not responding')
+          throw new Error(`Server responded with ${response.status}`)
         }
+        logger.info('✅ App server is running')
       } catch (error) {
         // Server not running, start it
+        logger.warn(`❌ Server not accessible: ${error.message}`)
         logger.info(`Starting server for job ${jobId}...`)
-        const serveResult = await serveApp(sandboxPath || `sandbox/${jobId}`, jobId)
         
-        if (!serveResult.success || !serveResult.url) {
+        try {
+          const serveResult = await serveApp(sandboxPath || `sandbox/${jobId}`, jobId)
+
+          if (!serveResult.success || !serveResult.url) {
+            return {
+              summaryText: `❌ Could not start the app server. The app might have been cleaned up.\n\n💡 Please generate a new app by saying: "Create a calculator app"`,
+              metadata: {
+                category: 'app_interaction',
+                processingTime: Date.now() - startTime,
+                status: 'error'
+              }
+            }
+          }
+
+          workingUrl = serveResult.url
+          logger.info(`✅ App server restarted at ${workingUrl}`)
+        } catch (serveError) {
+          logger.error('Failed to start server:', serveError)
           return {
-            summaryText: `❌ Could not start the app server. The app might have been cleaned up. Please generate a new app.`,
+            summaryText: `❌ Could not start the app server. Please generate a new app.\n\n💡 Try saying: "Create a calculator app"`,
             metadata: {
               category: 'app_interaction',
               processingTime: Date.now() - startTime,
@@ -66,22 +88,19 @@ export class AppInteractionAdapter implements Adapter {
             }
           }
         }
-        
-        workingUrl = serveResult.url
-        logger.info(`App server restarted at ${workingUrl}`)
       }
       
       // Test the app with user's request
-      const screenshotPath = await testAppWithInteraction(
+      const videoPath = await testAppWithInteraction(
         workingUrl,
         jobId,
         cleanRequest,
         appContext
       )
       
-      if (!screenshotPath) {
+      if (!videoPath) {
         return {
-          summaryText: `❌ Could not test the app with your request. The app might not be running or the request wasn't understood.`,
+          summaryText: `❌ Could not test the app with your request: "${cleanRequest}"\n\n🔍 Possible issues:\n• The app might not be running\n• The request wasn't understood\n• The app interface changed\n\n💡 Try:\n• Generating a new app first\n• Using simpler requests like "add 2+3"`,
           metadata: {
             category: 'app_interaction',
             processingTime: Date.now() - startTime,
@@ -95,13 +114,13 @@ export class AppInteractionAdapter implements Adapter {
         `Here's what happened:\n` +
         `• App: ${appContext}\n` +
         `• Action: ${cleanRequest}\n` +
-        `• Result: See screenshot below! 📸\n\n` +
+        `• Result: See video below! 🎥\n\n` +
         `Want to test something else? Just ask! 🚀`
       
       return {
         summaryText: message,
         ttsText: `Successfully tested the app with your request`,
-        attachments: [screenshotPath],
+        attachments: [videoPath],
         metadata: {
           category: 'app_interaction',
           processingTime: Date.now() - startTime,

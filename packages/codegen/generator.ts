@@ -17,7 +17,7 @@ Rules:
 7. Make apps responsive and accessible
 8. Use React 18 API (createRoot instead of render)
 9. ALWAYS use default exports for React components (export default ComponentName)
-10. Include Lingo.dev localization: wrap with LingoProvider, add "use i18n" directive, use t() function for text
+10. Include Lingo.dev localization: add "use i18n" directive, apps ready in English and Spanish by default
 
 Required dependencies for Vite + React projects:
 - dependencies: react, react-dom, "lingo.dev": "^0.112.0"
@@ -132,11 +132,12 @@ Include these files:
 ${task.project === 'backend' ? 'Include: package.json, tsconfig.json, src/index.ts' : ''}
 
 LINGO.DEV LOCALIZATION SETUP:
-1. In vite.config.ts: Use lingoCompiler.next() helper for auto-translation
+1. In vite.config.ts: Use lingoCompiler.next() helper for auto-translation to Spanish
 2. In src/App.tsx: Add "use i18n" directive at the very top of the file
-3. Write text naturally in English - Lingo.dev automatically detects and translates it
-4. The compiler scans files with "use i18n" and generates translations automatically
+3. Write text naturally in English - Lingo.dev automatically detects and translates to Spanish
+4. The compiler scans files with "use i18n" and generates Spanish translations automatically
 5. No runtime providers needed - works at build time
+6. Apps will be ready in both English and Spanish by default
 
 Vite Config Template with Lingo:
 \`\`\`typescript
@@ -146,7 +147,7 @@ import lingoCompiler from 'lingo.dev/compiler'
 
 export default lingoCompiler.next({
   sourceLocale: 'en',
-  targetLocales: ['es', 'fr']
+  targetLocales: ['es']
 })(defineConfig({
   plugins: [react()],
 }))
