@@ -89,3 +89,66 @@ export interface PlannerResult {
   error?: string
 }
 
+// Discord Types
+export interface DiscordInteraction {
+  id: string
+  application_id: string
+  type: number // 1 = PING, 2 = APPLICATION_COMMAND, 3 = MESSAGE_COMPONENT
+  data?: {
+    id: string
+    name: string
+    options?: Array<{
+      name: string
+      value: any
+      type: number
+    }>
+  }
+  guild_id?: string
+  channel_id?: string
+  member?: DiscordMember
+  user?: DiscordUser
+  token: string
+  message?: DiscordMessage
+}
+
+export interface DiscordMember {
+  user?: DiscordUser
+  nick?: string
+  roles: string[]
+}
+
+export interface DiscordUser {
+  id: string
+  username: string
+  discriminator: string
+  avatar?: string
+  bot?: boolean
+}
+
+export interface DiscordMessage {
+  id: string
+  channel_id: string
+  author: DiscordUser
+  content: string
+  timestamp: string
+  attachments?: Array<{
+    id: string
+    filename: string
+    size: number
+    url: string
+    proxy_url: string
+    content_type?: string
+  }>
+}
+
+// Gateway Orchestration Options
+export interface OrchestrateOptions {
+  chatId: number | string  // number for Telegram, string for Discord
+  messageId: number | string
+  voiceBuffer?: Buffer
+  textMessage?: string
+  username?: string
+  platform: 'telegram' | 'discord'
+  discordToken?: string  // For deferred responses
+}
+

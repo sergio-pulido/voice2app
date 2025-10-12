@@ -3,8 +3,7 @@
  */
 
 import { Hono } from 'hono'
-import { config, logger, type TelegramUpdate } from '../shared'
-import { orchestrate } from './orchestrator'
+import { config, logger, orchestrate, type TelegramUpdate } from '../shared'
 import { downloadVoiceFile } from './telegram-client'
 
 const app = new Hono()
@@ -113,6 +112,7 @@ async function processMessage(chatId: number, message: any) {
         messageId,
         voiceBuffer,
         username,
+        platform: 'telegram',
       })
     }
     // Handle text messages
@@ -125,6 +125,7 @@ async function processMessage(chatId: number, message: any) {
         messageId,
         textMessage: message.text,
         username,
+        platform: 'telegram',
       })
     }
     // Handle unsupported types

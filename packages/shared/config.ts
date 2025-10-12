@@ -34,6 +34,11 @@ export const config = {
   // Discord Admin
   discordWebhookUrl: process.env.DISCORD_WEBHOOK_URL || '',
   
+  // Discord Bot Gateway
+  discordBotToken: process.env.DISCORD_BOT_TOKEN || '',
+  discordApplicationId: process.env.DISCORD_APPLICATION_ID || '',
+  discordPublicKey: process.env.DISCORD_PUBLIC_KEY || '',
+  
   // Provider Selection
   sttProvider: (process.env.STT_PROVIDER || 'openai') as STTProvider,
   llmProvider: (process.env.LLM_PROVIDER || 'openai') as LLMProvider,
