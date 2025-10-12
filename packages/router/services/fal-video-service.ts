@@ -80,7 +80,8 @@ export async function generateVideoWithFabric(options: FabricVideoOptions): Prom
     const result = await fal.subscribe(falVideoModel, {
       input: {
         image_url: imageUrlToUse,
-        audio_url: audioUrlToUse
+        audio_url: audioUrlToUse,
+        resolution: resolution
       },
       logs: true,
       onQueueUpdate: (update) => {

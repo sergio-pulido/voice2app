@@ -9,11 +9,13 @@ import { readFile } from 'fs/promises'
 const TELEGRAM_API_BASE = 'https://api.telegram.org/bot'
 
 export async function sendNotification(payload: NotificationPayload): Promise<boolean> {
-  logger.info(`Sending notification to chat ${payload.chatId}`)
+  logger.info(`📤 Sending notification to chat ${payload.chatId}`)
+  logger.info(`🎤 Voice flag: ${payload.voice}`)
   
   try {
-    // If voice reply is requested, send voice message
+    // If voice reply is requested, send BOTH voice and text
     if (payload.voice) {
+      logger.info('🎤 Voice response requested - will send BOTH voice and text!')
       logger.info('🎤 Generating voice reply with TTS...')
       
       // Create a clean version of the text for TTS (no markdown, no emojis)
@@ -21,7 +23,7 @@ export async function sendNotification(payload: NotificationPayload): Promise<bo
         .replace(/\*/g, '')  // Remove markdown bold
         .replace(/_/g, '')   // Remove markdown italic
         .replace(/`/g, '')   // Remove code blocks
-        .replace(/[✅❌⚠️🎉💡📊🏃💻📋🎤📝📸🔧]/g, '')  // Remove emojis
+        .replace(/[✅❌⚠️🎉💡📊🏃💻📋🎤📝📸🔧🤖💬🎨🎬🌐❓]/g, '')  // Remove emojis
         .replace(/\n{3,}/g, '\n\n')  // Remove excessive newlines
         .trim()
       
@@ -29,29 +31,35 @@ export async function sendNotification(payload: NotificationPayload): Promise<bo
       const MAX_TTS_LENGTH = 500  // chars
       if (cleanText.length > MAX_TTS_LENGTH) {
         cleanText = cleanText.substring(0, MAX_TTS_LENGTH) + '... See the full details in the text message.'
-        logger.info(`Text truncated for TTS: ${cleanText.length} chars`)
+        logger.info(`📝 Text truncated for TTS: ${cleanText.length} chars`)
       }
+      
+      logger.info(`🎤 TTS input (${cleanText.length} chars): "${cleanText.substring(0, 100)}..."`)
       
       const audioBuffer = await textToSpeech({ text: cleanText })
       
       if (audioBuffer) {
+        logger.success(`✅ TTS generated audio buffer: ${Math.round(audioBuffer.length / 1024)}KB`)
         try {
+          logger.info('📤 Sending voice message...')
           await sendVoice(payload.chatId, audioBuffer)
-          logger.success('Voice message sent')
+          logger.success('✅ Voice message sent!')
           
           // Also send the full text version for reference
-          logger.debug('Sending full text version as well...')
+          logger.info('📤 Sending text message (full version)...')
           await sendMessage(payload.chatId, payload.text)
+          logger.success('✅ Text message sent!')
         } catch (voiceError) {
-          logger.warn('Voice sending failed, using text only:', voiceError)
+          logger.error('❌ Voice sending failed, using text only:', voiceError)
           await sendMessage(payload.chatId, payload.text)
         }
       } else {
-        logger.warn('TTS failed, using text only')
+        logger.error('❌ TTS returned null/empty buffer - using text only')
         await sendMessage(payload.chatId, payload.text)
       }
     } else {
-      // Send text message
+      // Send text message only
+      logger.info('📝 Text-only response (no voice)')
       await sendMessage(payload.chatId, payload.text)
     }
     
@@ -190,22 +198,9 @@ export async function sendAcknowledgment(chatId: number, messageType: 'voice' | 
     ? '🎤 Got your voice message! Processing...'
     : '📝 Got your message! Processing...'
   
-  // If input was voice, acknowledge with voice
-  if (messageType === 'voice') {
-    logger.info('🎤 Sending voice acknowledgment...')
-    
-    const cleanText = 'Got your voice message! Processing...'
-    const audioBuffer = await textToSpeech({ text: cleanText })
-    
-    if (audioBuffer) {
-      await sendVoice(chatId, audioBuffer)
-      return
-    }
-    
-    // Fallback to text if TTS fails
-    logger.warn('TTS failed for acknowledgment, using text')
-  }
-  
+  // Always send acknowledgment as TEXT (no voice)
+  // User will get voice response only for the final result
+  logger.info('📝 Sending text acknowledgment...')
   await sendMessage(chatId, text)
 }
 
