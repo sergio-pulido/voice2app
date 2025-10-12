@@ -17,9 +17,10 @@ Rules:
 7. Make apps responsive and accessible
 8. Use React 18 API (createRoot instead of render)
 9. ALWAYS use default exports for React components (export default ComponentName)
+10. Include Lingo.dev localization: wrap with LingoProvider, add "use i18n" directive, use t() function for text
 
 Required dependencies for Vite + React projects:
-- dependencies: react, react-dom
+- dependencies: react, react-dom, "lingo.dev": "^0.112.0"
 - devDependencies: @vitejs/plugin-react, @types/react, @types/react-dom, typescript, vite, tailwindcss, autoprefixer, postcss
 
 React Component Template (ALWAYS include default export):
@@ -118,17 +119,68 @@ ${task.checks.length > 0 ? `Must include: ${task.checks.join(', ')}` : ''}
 Generate a complete, working application with all necessary files.
 ${isFullstackOrFrontend ? `
 Include these files:
-- package.json (with ALL required dependencies: react, react-dom, AND devDependencies: @vitejs/plugin-react, @types/react, @types/react-dom, typescript, vite, tailwindcss, autoprefixer, postcss. Add "type": "module" to package.json)
-- vite.config.ts (import react from '@vitejs/plugin-react')
+- package.json (with ALL required dependencies: react, react-dom, "lingo.dev": "^0.112.0", AND devDependencies: @vitejs/plugin-react, @types/react, @types/react-dom, typescript, vite, tailwindcss, autoprefixer, postcss. Add "type": "module" to package.json)
+- vite.config.ts (import react from '@vitejs/plugin-react', import lingoCompiler from 'lingo.dev/compiler')
 - tsconfig.json
 - postcss.config.cjs (use CommonJS format with module.exports) OR postcss.config.js (use ES module format with export default)
 - tailwind.config.js (use ES module format with export default)
 - index.html
 - src/main.tsx (use React 18 createRoot API from 'react-dom/client')
-- src/App.tsx (MUST have export default App)
+- src/App.tsx (MUST have export default App, include "use i18n" directive at top for localization)
 - src/index.css (with Tailwind directives: @tailwind base; @tailwind components; @tailwind utilities;)
 ` : ''}
 ${task.project === 'backend' ? 'Include: package.json, tsconfig.json, src/index.ts' : ''}
+
+LINGO.DEV LOCALIZATION SETUP:
+1. In vite.config.ts: Use lingoCompiler.next() helper for auto-translation
+2. In src/App.tsx: Add "use i18n" directive at the very top of the file
+3. Write text naturally in English - Lingo.dev automatically detects and translates it
+4. The compiler scans files with "use i18n" and generates translations automatically
+5. No runtime providers needed - works at build time
+
+Vite Config Template with Lingo:
+\`\`\`typescript
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import lingoCompiler from 'lingo.dev/compiler'
+
+export default lingoCompiler.next({
+  sourceLocale: 'en',
+  targetLocales: ['es', 'fr']
+})(defineConfig({
+  plugins: [react()],
+}))
+\`\`\`
+
+Main.tsx Template (Lingo works at build time, no runtime provider needed):
+\`\`\`typescript
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App.tsx'
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+)
+\`\`\`
+
+App.tsx Template with i18n:
+\`\`\`typescript
+"use i18n"
+import React from 'react'
+
+function App() {
+  return (
+    <div>
+      <h1>Welcome to My App</h1>
+      <p>This text will be automatically translated</p>
+    </div>
+  )
+}
+
+export default App
+\`\`\`
 
 Return the JSON array of files.`
 }
