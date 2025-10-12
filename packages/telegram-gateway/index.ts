@@ -291,7 +291,7 @@ async function handleVideoSessionMessage(chatId: number, message: any, session: 
       if (message.voice) {
         logger.info('🎤 Voice message received for video generation')
         
-        await sendMessage(chatId, '🎬 Generating your video... This may take 20-40 seconds.')
+        await sendMessage(chatId, '🎬 Generating your video... This may take 3-4 minutes.')
         
         // Download voice file
         const voiceBuffer = await downloadVoiceFile(message.voice.file_id)
@@ -314,7 +314,7 @@ async function handleVideoSessionMessage(chatId: number, message: any, session: 
         setVideoSessionAudio(chatId, audioPath)
         
         // Generate video!
-        logger.info('🎬 Starting talking video generation with fal.ai Fabric 1.0...')
+        logger.info('🎬 Starting talking video generation with fal.ai Fabric 1.0... This may take 3-4 minutes.')
         const videoPath = await generateVideoWithFabricRetry({
           imageUrl: session.imagePath!,
           audioUrl: audioPath,
