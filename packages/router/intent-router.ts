@@ -4,7 +4,7 @@
 
 import { logger } from '../shared'
 
-export type IntentCategory = 'qa' | 'app_code' | 'image_gen' | 'video_gen' | 'translate' | 'help' | 'friend'
+export type IntentCategory = 'qa' | 'app_code' | 'app_interaction' | 'image_gen' | 'video_gen' | 'translate' | 'help' | 'friend'
 
 export interface IntentResult {
   category: IntentCategory
@@ -171,6 +171,11 @@ async function groqClassify(text: string): Promise<IntentResult> {
    ✅ "Create a counter app", "Build a landing page", "Make a todo list", "Build a website"
    ✅ "crea una app", "haz una página"
 
+**"app_interaction"** - Testing/using/interacting with an already generated app
+   🎯 Keywords: test, use, play, click, add, subtract, calculate, interact
+   ✅ "Add 2+5", "Play the game", "Test the calculator", "Click the button"
+   ✅ "suma 2+5", "juega el juego", "prueba la calculadora"
+
 **"translate"** - Translation between languages
    🎯 Keywords: translate, how do you say, what is X in [language]
    ✅ "Translate 'Hello' to Spanish", "How do you say 'cat' in French?", "What is 'good morning' in German?"
@@ -195,7 +200,7 @@ async function groqClassify(text: string): Promise<IntentResult> {
 - "What is X?" → qa (factual question)
 - "How do I create X?" → probably app_code if about building something
 
-Respond with ONLY ONE WORD: image_gen, video_gen, app_code, translate, help, qa, or friend
+Respond with ONLY ONE WORD: image_gen, video_gen, app_code, app_interaction, translate, help, qa, or friend
 
 When in doubt between friend and a command: CHOOSE THE COMMAND.`
             },
@@ -224,7 +229,7 @@ When in doubt between friend and a command: CHOOSE THE COMMAND.`
       const result = data.choices[0]?.message?.content?.trim().toLowerCase() || 'qa'
       
       // Validate the response
-      const validCategories: IntentCategory[] = ['help', 'friend', 'qa', 'app_code', 'image_gen', 'video_gen', 'translate']
+      const validCategories: IntentCategory[] = ['help', 'friend', 'qa', 'app_code', 'app_interaction', 'image_gen', 'video_gen', 'translate']
       const category = validCategories.includes(result as IntentCategory) 
         ? result as IntentCategory 
         : 'qa'
@@ -294,6 +299,7 @@ export function getCategoryName(category: IntentCategory): string {
     'friend': '🤖 Barna Hacker',
     'qa': '💬 Q&A',
     'app_code': '💻 App Builder',
+    'app_interaction': '🎮 App Tester',
     'image_gen': '🎨 Image Generator',
     'video_gen': '🎬 Video Generator',
     'translate': '🌐 Translator'
@@ -310,6 +316,7 @@ export function getCategoryEmoji(category: IntentCategory): string {
     'friend': '🤖',
     'qa': '💬',
     'app_code': '💻',
+    'app_interaction': '🎮',
     'image_gen': '🎨',
     'video_gen': '🎬',
     'translate': '🌐'

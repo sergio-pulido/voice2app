@@ -8,6 +8,7 @@ import { processInput } from '../../planner'
 import { generateApp } from '../../codegen'
 import { runApp } from '../../runner'
 import { analyzeResults } from '../../analyzer'
+import { setUserAppSession } from '../services/session-store'
 import type { Adapter, AdapterInput, AdapterOutput } from '../types'
 
 export class AppCodeAdapter implements Adapter {
@@ -58,15 +59,34 @@ export class AppCodeAdapter implements Adapter {
       let message = `${statusEmoji} ${task.context}\n\n`
       message += `${analysisResult.summary}\n\n`
       
-      if (analysisResult.suggestions.length > 0) {
-        message += `💡 Suggestions:\n`
-        analysisResult.suggestions.forEach((suggestion, i) => {
-          message += `${i + 1}. ${suggestion}\n`
-        })
+      // Add interactive choices for successful apps
+      if (analysisResult.status === 'success' && runnerResult.url) {
+        message += `🎮 What would you like to do next?\n\n`
+        message += `1️⃣ Test the app - Ask me to interact with it (e.g., "add 2+5", "play the game")\n`
+        message += `2️⃣ Close - We're done here\n\n`
+        message += `Just tell me what you want to test! 🚀\n\n`
+      } else {
+        if (analysisResult.suggestions.length > 0) {
+          message += `💡 Suggestions:\n`
+          analysisResult.suggestions.forEach((suggestion, i) => {
+            message += `${i + 1}. ${suggestion}\n`
+          })
+        }
       }
       
       if (plannerResult.transcription) {
         message += `\nTranscribed: "${plannerResult.transcription}"`
+      }
+      
+      // Store session data for interactive testing
+      if (analysisResult.status === 'success' && runnerResult.url) {
+        setUserAppSession(
+          input.userId,
+          runnerResult.url,
+          task.context,
+          task.jobId,
+          codegenResult.sandboxPath
+        )
       }
       
       const processingTime = Date.now() - startTime
@@ -82,7 +102,11 @@ export class AppCodeAdapter implements Adapter {
           status: analysisResult.status,
           project: task.project,
           intent: task.intent,
-          jobId: task.jobId
+          jobId: task.jobId,
+          // Store app info for interactive testing
+          appUrl: runnerResult.url,
+          appContext: task.context,
+          sandboxPath: codegenResult.sandboxPath
         }
       }
     } catch (error) {

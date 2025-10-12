@@ -74,19 +74,14 @@ export async function runApp(task: Task, sandboxPath: string): Promise<RunnerRes
       errors: [error instanceof Error ? error.message : 'Unknown error'],
     }
   } finally {
-    // Cleanup: stop server
-    if (serverProcess) {
-      try {
-        serverProcess.kill()
-        logger.debug(`Server stopped for job ${task.jobId}`)
-      } catch (e) {
-        logger.warn('Failed to stop server:', e)
-      }
-    }
+    // Note: We don't stop the server here anymore - it needs to stay running for interaction testing
+    // The server will be cleaned up when the sandbox is cleaned up or when explicitly stopped
+    logger.debug(`Server left running for job ${task.jobId} at ${url}`)
   }
 }
 
 export { buildApp } from './builder'
 export { serveApp } from './server'
 export { captureScreenshot } from './screenshot'
+export { testAppWithInteraction } from './app-interactor'
 
