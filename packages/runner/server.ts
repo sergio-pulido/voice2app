@@ -71,7 +71,7 @@ export async function serveApp(sandboxPath: string, jobId: string): Promise<Serv
     // Vite uses port 5173 by default, or we can configure it
     const port = 3000 + Math.floor(Math.random() * 1000)
     
-    const serverProcess = spawn('bun', ['run', 'dev', '--port', port.toString(), '--host', 'localhost'], {
+    const serverProcess = spawn('bun', ['run', 'dev', '--port', port.toString(), '--host', '0.0.0.0'], {
       cwd: sandboxPath,
       shell: true,
     })
@@ -83,7 +83,7 @@ export async function serveApp(sandboxPath: string, jobId: string): Promise<Serv
       const output = data.toString()
       logs.push(output)
       // Detect when Vite is ready
-      if (output.includes('Local:') || output.includes('localhost') || output.includes('ready in')) {
+      if (output.includes('Local:') || output.includes('localhost') || output.includes('ready in') || output.includes('dev server running')) {
         serverReady = true
       }
     })

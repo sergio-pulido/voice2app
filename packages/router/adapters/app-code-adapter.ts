@@ -59,6 +59,12 @@ export class AppCodeAdapter implements Adapter {
       let message = `${statusEmoji} ${task.context}\n\n`
       message += `${analysisResult.summary}\n\n`
       
+      // Add public URL right after summary if available (even for failed apps)
+      if (runnerResult.publicUrl) {
+        message += `🌐 **Try your app here**: ${runnerResult.publicUrl}\n`
+        message += `_Note: The link will work for a few hours_\n\n`
+      }
+      
       // Add interactive choices for successful apps
       if (analysisResult.status === 'success' && runnerResult.url) {
         message += `🎮 What would you like to do next?\n\n`

@@ -7,26 +7,33 @@ import { createLLMProvider } from './providers'
 
 const CODEGEN_SYSTEM_PROMPT = `You are an expert full-stack developer. Generate complete, production-ready code based on user requirements.
 
-Rules:
-1. Generate clean, modern, well-structured code
-2. Use best practices and follow conventions
-3. Include ALL necessary dependencies in package.json (including @vitejs/plugin-react for Vite projects)
-4. For frontend: use modern React 18 with TypeScript, Vite, and Tailwind CSS
-5. For backend: use Node.js/Bun with TypeScript
-6. Always include a README.md with setup instructions
-7. Make apps responsive and accessible
-8. Use React 18 API (createRoot instead of render)
-9. ALWAYS use default exports for React components (export default ComponentName)
-10. CONDITIONAL Lingo.dev localization: ONLY include Lingo.dev if user doesn't explicitly request "no localization". If user requests "no localization", skip Lingo.dev completely and use standard Vite config.
-11. For authentication requests: Create simple mock authentication (no external auth services, skip Lingo.dev to avoid build conflicts)
-12. Keep it simple: Avoid complex backend integrations, use localStorage for data persistence
-13. 🎨 CRITICAL: Create BEAUTIFUL, modern UI/UX with professional design - NO basic/unstyled elements
-14. Use comprehensive Tailwind CSS styling with gradients, shadows, animations, and modern design patterns
-15. Apply consistent color schemes, typography, spacing, and visual hierarchy
-16. Make apps look like premium, production-ready applications
-17. 🚨 NEVER use inline styles - ALWAYS use Tailwind CSS classes for styling
-18. 🚨 ALWAYS import './index.css' in App.tsx for Tailwind to work
-19. 🚨 ALWAYS use modern layouts with proper spacing, gradients, and shadows
+🚨🚨🚨 CRITICAL RULES - NO EXCEPTIONS:
+1. 🚫 NEVER generate placeholder code, comments like "// Game logic here", or TODOs
+2. 🚫 NEVER generate skeleton code - ALWAYS implement FULL, WORKING functionality
+3. 🚫 NEVER leave parts unimplemented - every feature MUST be fully coded
+4. ✅ ALWAYS generate COMPLETE, EXECUTABLE code that works immediately
+5. ✅ If it's a game, implement the ENTIRE game logic, not just the UI shell
+
+Additional Rules:
+6. Generate clean, modern, well-structured code
+7. Use best practices and follow conventions
+8. Include ALL necessary dependencies in package.json (including @vitejs/plugin-react for Vite projects)
+9. For frontend: use modern React 18 with TypeScript, Vite, and Tailwind CSS
+10. For backend: use Node.js/Bun with TypeScript
+11. Always include a README.md with setup instructions
+12. Make apps responsive and accessible
+13. Use React 18 API (createRoot instead of render)
+14. ALWAYS use default exports for React components (export default ComponentName)
+15. CONDITIONAL Lingo.dev localization: ONLY include Lingo.dev if user doesn't explicitly request "no localization". If user requests "no localization", skip Lingo.dev completely and use standard Vite config.
+16. For authentication requests: Create simple mock authentication (no external auth services, skip Lingo.dev to avoid build conflicts)
+17. Keep it simple: Avoid complex backend integrations, use localStorage for data persistence
+18. 🎨 CRITICAL: Create BEAUTIFUL, modern UI/UX with professional design - NO basic/unstyled elements
+19. Use comprehensive Tailwind CSS styling with gradients, shadows, animations, and modern design patterns
+20. Apply consistent color schemes, typography, spacing, and visual hierarchy
+21. Make apps look like premium, production-ready applications
+22. 🚨 NEVER use inline styles - ALWAYS use Tailwind CSS classes for styling
+23. 🚨 ALWAYS import './index.css' in App.tsx for Tailwind to work
+24. 🚨 ALWAYS use modern layouts with proper spacing, gradients, and shadows
 
 Required dependencies for Vite + React projects:
 - dependencies: react, react-dom (add "lingo.dev": "^0.112.0" ONLY if localization is requested)
@@ -171,6 +178,13 @@ export async function generateCode(task: Task): Promise<GeneratedFile[]> {
 function buildPrompt(task: Task): string {
   const isFullstackOrFrontend = task.project.includes('frontend') || task.project === 'fullstack' || task.project === 'mvp'
   
+  // Debug: Log task context for template detection
+  logger.info(`Task context: "${task.context}"`)
+  const isTetrisRequest = task.context.toLowerCase().includes('tetris') || 
+                         task.context.toLowerCase().includes('tetromino') || 
+                         (task.context.toLowerCase().includes('game') && task.context.toLowerCase().includes('blocks'))
+  logger.info(`Is Tetris request: ${isTetrisRequest}`)
+  
   // Determine if we should include Lingo.dev localization
   // DEFAULT: Do NOT include Lingo unless explicitly requested
   const shouldIncludeLingo = (task.context.toLowerCase().includes('localization') || 
@@ -226,6 +240,13 @@ export default lingoCompiler.next({
   targetLocales: ['es']
 })(defineConfig({
   plugins: [react()],
+  server: {
+    host: '0.0.0.0',
+    port: 5173,
+    strictPort: false,
+    allowedHosts: 'all',
+    cors: true
+  }
 }))
 \`\`\`` : `Vite Config Template WITHOUT Lingo (user requested no localization):
 \`\`\`typescript
@@ -234,6 +255,19 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  server: {
+    host: '0.0.0.0',
+    port: 5173,
+    strictPort: false,
+    allowedHosts: 'all',
+    hmr: {
+      port: 24678
+    },
+    cors: true
+  },
+  preview: {
+    host: '0.0.0.0'
+  }
 })
 \`\`\``}
 
@@ -629,6 +663,250 @@ function App() {
 export default App
 \`\`\`
 🐍 Use this template for snake games - it has beautiful styling! 🐍` : ''}
+
+${isTetrisRequest ? `
+🎮 BEAUTIFUL TETRIS GAME TEMPLATE (use this for tetris games):
+\`\`\`tsx
+import React, { useState, useEffect, useRef, useCallback } from 'react'
+import './index.css'
+
+const BOARD_WIDTH = 10
+const BOARD_HEIGHT = 20
+const BLOCK_SIZE = 30
+
+const TETROMINOS = {
+  I: { shape: [[1, 1, 1, 1]], color: 'bg-cyan-500' },
+  O: { shape: [[1, 1], [1, 1]], color: 'bg-yellow-500' },
+  T: { shape: [[0, 1, 0], [1, 1, 1]], color: 'bg-purple-500' },
+  S: { shape: [[0, 1, 1], [1, 1, 0]], color: 'bg-green-500' },
+  Z: { shape: [[1, 1, 0], [0, 1, 1]], color: 'bg-red-500' },
+  J: { shape: [[1, 0, 0], [1, 1, 1]], color: 'bg-blue-500' },
+  L: { shape: [[0, 0, 1], [1, 1, 1]], color: 'bg-orange-500' }
+}
+
+function App() {
+  const [board, setBoard] = useState(Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0)))
+  const [currentPiece, setCurrentPiece] = useState<any>(null)
+  const [position, setPosition] = useState({ x: 4, y: 0 })
+  const [score, setScore] = useState(0)
+  const [gameOver, setGameOver] = useState(false)
+  const [isPaused, setIsPaused] = useState(false)
+
+  const getRandomPiece = () => {
+    const pieces = Object.keys(TETROMINOS)
+    const randomPiece = pieces[Math.floor(Math.random() * pieces.length)]
+    return TETROMINOS[randomPiece as keyof typeof TETROMINOS]
+  }
+
+  const checkCollision = useCallback((piece: any, pos: { x: number; y: number }) => {
+    if (!piece) return false
+    for (let y = 0; y < piece.shape.length; y++) {
+      for (let x = 0; x < piece.shape[y].length; x++) {
+        if (piece.shape[y][x]) {
+          const newX = pos.x + x
+          const newY = pos.y + y
+          if (newX < 0 || newX >= BOARD_WIDTH || newY >= BOARD_HEIGHT) return true
+          if (newY >= 0 && board[newY][newX]) return true
+        }
+      }
+    }
+    return false
+  }, [board])
+
+  const mergePiece = useCallback(() => {
+    if (!currentPiece) return
+    const newBoard = board.map(row => [...row])
+    currentPiece.shape.forEach((row: number[], y: number) => {
+      row.forEach((value, x) => {
+        if (value) {
+          const boardY = position.y + y
+          const boardX = position.x + x
+          if (boardY >= 0 && boardY < BOARD_HEIGHT && boardX >= 0 && boardX < BOARD_WIDTH) {
+            newBoard[boardY][boardX] = currentPiece.color
+          }
+        }
+      })
+    })
+    setBoard(newBoard)
+    
+    // Check for completed lines
+    let linesCleared = 0
+    const clearedBoard = newBoard.filter(row => {
+      if (row.every(cell => cell !== 0)) {
+        linesCleared++
+        return false
+      }
+      return true
+    })
+    while (clearedBoard.length < BOARD_HEIGHT) {
+      clearedBoard.unshift(Array(BOARD_WIDTH).fill(0))
+    }
+    if (linesCleared > 0) {
+      setBoard(clearedBoard)
+      setScore(s => s + linesCleared * 100)
+    }
+  }, [currentPiece, position, board])
+
+  const rotatePiece = useCallback(() => {
+    if (!currentPiece || isPaused || gameOver) return
+    const rotated = currentPiece.shape[0].map((_: any, i: number) =>
+      currentPiece.shape.map((row: number[]) => row[i]).reverse()
+    )
+    const rotatedPiece = { ...currentPiece, shape: rotated }
+    if (!checkCollision(rotatedPiece, position)) {
+      setCurrentPiece(rotatedPiece)
+    }
+  }, [currentPiece, position, checkCollision, isPaused, gameOver])
+
+  const moveDown = useCallback(() => {
+    if (!currentPiece || isPaused || gameOver) return
+    const newPos = { ...position, y: position.y + 1 }
+    if (checkCollision(currentPiece, newPos)) {
+      mergePiece()
+      const newPiece = getRandomPiece()
+      const startPos = { x: 4, y: 0 }
+      if (checkCollision(newPiece, startPos)) {
+        setGameOver(true)
+      } else {
+        setCurrentPiece(newPiece)
+        setPosition(startPos)
+      }
+    } else {
+      setPosition(newPos)
+    }
+  }, [currentPiece, position, checkCollision, mergePiece, isPaused, gameOver])
+
+  const moveHorizontal = useCallback((dir: number) => {
+    if (!currentPiece || isPaused || gameOver) return
+    const newPos = { ...position, x: position.x + dir }
+    if (!checkCollision(currentPiece, newPos)) {
+      setPosition(newPos)
+    }
+  }, [currentPiece, position, checkCollision, isPaused, gameOver])
+
+  useEffect(() => {
+    if (!currentPiece && !gameOver) {
+      setCurrentPiece(getRandomPiece())
+    }
+  }, [currentPiece, gameOver])
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!isPaused && !gameOver) moveDown()
+    }, 500)
+    return () => clearInterval(interval)
+  }, [moveDown, isPaused, gameOver])
+
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (gameOver || isPaused) return
+      if (e.key === 'ArrowLeft') moveHorizontal(-1)
+      if (e.key === 'ArrowRight') moveHorizontal(1)
+      if (e.key === 'ArrowDown') moveDown()
+      if (e.key === 'ArrowUp' || e.key === ' ') rotatePiece()
+    }
+    window.addEventListener('keydown', handleKeyPress)
+    return () => window.removeEventListener('keydown', handleKeyPress)
+  }, [moveHorizontal, moveDown, rotatePiece, gameOver, isPaused])
+
+  const renderBoard = () => {
+    const display = board.map(row => [...row])
+    if (currentPiece) {
+      currentPiece.shape.forEach((row: number[], y: number) => {
+        row.forEach((value, x) => {
+          if (value) {
+            const boardY = position.y + y
+            const boardX = position.x + x
+            if (boardY >= 0 && boardY < BOARD_HEIGHT && boardX >= 0 && boardX < BOARD_WIDTH) {
+              display[boardY][boardX] = currentPiece.color
+            }
+          }
+        })
+      })
+    }
+    return display
+  }
+
+  const restart = () => {
+    setBoard(Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(0)))
+    setCurrentPiece(null)
+    setPosition({ x: 4, y: 0 })
+    setScore(0)
+    setGameOver(false)
+    setIsPaused(false)
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4">
+      <div className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl p-8 border border-white/20">
+        <h1 className="text-5xl font-bold text-center mb-6 bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 bg-clip-text text-transparent">
+          Tetris Game
+        </h1>
+        
+        <div className="flex flex-col md:flex-row gap-6 items-start">
+          <div className="bg-black/30 rounded-xl p-4 border-4 border-purple-500/50 shadow-xl">
+            <div className="grid gap-0.5" style={{ gridTemplateColumns: \`repeat(\${BOARD_WIDTH}, \${BLOCK_SIZE}px)\` }}>
+              {renderBoard().map((row, y) =>
+                row.map((cell, x) => (
+                  <div
+                    key={\`\${y}-\${x}\`}
+                    className={\`\${cell || 'bg-gray-900/50'} border border-gray-800/30 transition-all duration-100\`}
+                    style={{ width: BLOCK_SIZE, height: BLOCK_SIZE }}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-4 min-w-[200px]">
+            <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl p-6 backdrop-blur border border-white/10">
+              <p className="text-white/70 text-sm mb-1">Score</p>
+              <p className="text-4xl font-bold text-white">{score}</p>
+            </div>
+
+            <div className="bg-white/10 rounded-xl p-4 backdrop-blur border border-white/10">
+              <p className="text-white/90 text-sm mb-3 font-semibold">Controls</p>
+              <div className="text-white/70 text-xs space-y-1">
+                <p>← → Move</p>
+                <p>↓ Drop faster</p>
+                <p>↑ / Space Rotate</p>
+              </div>
+            </div>
+
+            {gameOver && (
+              <div className="bg-red-500/20 border-2 border-red-500 rounded-xl p-4 backdrop-blur">
+                <p className="text-white font-bold mb-3">Game Over!</p>
+                <button
+                  onClick={restart}
+                  className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-bold py-2 px-4 rounded-lg transition-all transform hover:scale-105"
+                >
+                  Play Again
+                </button>
+              </div>
+            )}
+
+            {!gameOver && (
+              <button
+                onClick={() => setIsPaused(!isPaused)}
+                className="w-full bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white font-bold py-2 px-4 rounded-lg transition-all transform hover:scale-105"
+              >
+                {isPaused ? '▶ Resume' : '⏸ Pause'}
+              </button>
+            )}
+          </div>
+        </div>
+
+        <p className="text-center text-white/50 text-sm mt-6">
+          Clear lines to score points! 🎮
+        </p>
+      </div>
+    </div>
+  )
+}
+
+export default App
+\`\`\`
+🎮 Use this template for tetris games - it has beautiful styling and full game logic! 🎮` : ''}
 
 Return the JSON array of files.`
 }

@@ -6,6 +6,7 @@ import { config, logger, type Task, type RunnerResult } from '../shared'
 import { buildApp } from './builder'
 import { serveApp } from './server'
 import { captureScreenshot } from './screenshot'
+import { createTunnel } from './tunnel'
 import { join } from 'path'
 
 export async function runApp(task: Task, sandboxPath: string): Promise<RunnerResult> {
@@ -43,7 +44,17 @@ export async function runApp(task: Task, sandboxPath: string): Promise<RunnerRes
     
     logger.success(`App running at ${url}`)
     
-    // Step 3: Capture screenshot (if requested)
+    // Step 3: Create ngrok tunnel for public access
+    let publicUrl: string | undefined
+    const tunnelResult = await createTunnel(url, task.jobId)
+    if (tunnelResult.success && tunnelResult.publicUrl) {
+      publicUrl = tunnelResult.publicUrl
+      logger.success(`🌐 Public URL created: ${publicUrl}`)
+    } else {
+      logger.warn(`Failed to create public URL: ${tunnelResult.error || 'Unknown error'}`)
+    }
+    
+    // Step 4: Capture screenshot (if requested)
     let screenshot: string | undefined
     
     if (task.artifact.screenshot) {
@@ -54,7 +65,7 @@ export async function runApp(task: Task, sandboxPath: string): Promise<RunnerRes
       }
     }
     
-    // Step 4: Collect logs
+    // Step 5: Collect logs
     const logs = [...buildResult.logs, ...serveResult.logs]
     
     return {
@@ -63,6 +74,7 @@ export async function runApp(task: Task, sandboxPath: string): Promise<RunnerRes
       logs,
       errors: [],
       url,
+      publicUrl,
       buildLogs: buildResult.logs,
     }
   } catch (error) {

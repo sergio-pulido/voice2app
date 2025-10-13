@@ -59,6 +59,7 @@ export interface RunnerResult {
   logs: string[]
   errors: string[]
   url?: string
+  publicUrl?: string
   buildLogs?: string[]
 }
 
