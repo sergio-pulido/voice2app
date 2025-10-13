@@ -76,6 +76,7 @@ export interface NotificationPayload {
   text: string
   screenshot?: string
   voice?: boolean
+  channel?: string  // 'telegram', 'whatsapp', 'discord', 'slack', etc.
 }
 
 export interface STTResult {

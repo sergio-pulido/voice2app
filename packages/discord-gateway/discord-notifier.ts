@@ -2,16 +2,50 @@
  * Discord Notifier: sends replies to Discord
  */
 
-import { config, logger } from '../shared'
+import { config, logger, splitMessageForChannel } from '../shared'
 import { textToSpeech } from '../shared/tts'
 import { readFile } from 'fs/promises'
 import { editInteractionResponse } from './discord-client'
+
+/**
+ * Send a message with automatic splitting for Discord limits
+ */
+async function sendDiscordMessageWithSplitting(token: string, text: string): Promise<void> {
+  try {
+    const splitResult = await splitMessageForChannel(text, 'discord')
+    
+    if (splitResult.needsSplitting) {
+      logger.info(`📝 Discord message split into ${splitResult.messages.length} parts`)
+      
+      // Send each message part
+      for (let i = 0; i < splitResult.messages.length; i++) {
+        const message = splitResult.messages[i]
+        logger.debug(`📤 Sending Discord message part ${i + 1}/${splitResult.messages.length} (${message.length} chars)`)
+        
+        await editInteractionResponse(token, message)
+        
+        // Small delay between messages to avoid rate limiting
+        if (i < splitResult.messages.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000))
+        }
+      }
+    } else {
+      // Single message, send normally
+      await editInteractionResponse(token, text)
+    }
+  } catch (error) {
+    logger.error('Discord message splitting failed, sending original message:', error)
+    // Fallback: try to send the original message
+    await editInteractionResponse(token, text)
+  }
+}
 
 interface DiscordNotificationPayload {
   chatId: number | string
   text: string
   screenshot?: string
   voice?: boolean
+  channel?: string
   discordToken?: string
 }
 
@@ -63,11 +97,11 @@ export async function sendNotification(payload: DiscordNotificationPayload): Pro
           return true
         } catch (voiceError) {
           logger.warn('Voice sending failed, using text only:', voiceError)
-          await editInteractionResponse(discordToken, formattedText)
+          await sendDiscordMessageWithSplitting(discordToken, formattedText)
         }
       } else {
         logger.warn('TTS failed, using text only')
-        await editInteractionResponse(discordToken, formattedText)
+        await sendDiscordMessageWithSplitting(discordToken, formattedText)
       }
     } else {
       // Send text message
@@ -83,10 +117,10 @@ export async function sendNotification(payload: DiscordNotificationPayload): Pro
         } catch (error) {
           logger.error('Failed to send screenshot:', error)
           // Send without screenshot
-          await editInteractionResponse(discordToken, formattedText)
+          await sendDiscordMessageWithSplitting(discordToken, formattedText)
         }
       } else {
-        await editInteractionResponse(discordToken, formattedText)
+        await sendDiscordMessageWithSplitting(discordToken, formattedText)
       }
     }
     

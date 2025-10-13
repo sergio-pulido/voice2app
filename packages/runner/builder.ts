@@ -37,12 +37,19 @@ export async function buildApp(sandboxPath: string, jobId: string): Promise<Buil
       return { success: true, logs, errors }
     }
     
-    // Read package.json to check for build script
+    // Read package.json to check for build script and Vite
     const packageJson = JSON.parse(await readFile(packageJsonPath, 'utf-8'))
     const hasBuildScript = packageJson.scripts?.build
+    const isViteProject = packageJson.devDependencies?.vite || packageJson.dependencies?.vite
     
     if (!hasBuildScript) {
       logs.push('No build script found in package.json')
+      return { success: true, logs, errors }
+    }
+    
+    // For Vite projects, skip building here - the server will handle it
+    if (isViteProject) {
+      logs.push('Vite project detected, build will be handled by server')
       return { success: true, logs, errors }
     }
     

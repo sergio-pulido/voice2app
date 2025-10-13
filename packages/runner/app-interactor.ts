@@ -27,7 +27,9 @@ export async function testAppWithInteraction(
   url: string,
   jobId: string,
   userRequest: string,
-  appContext: string
+  appContext: string,
+  screenshotPath?: string,
+  appCode?: string
 ): Promise<string | null> {
   logger.debug(`Testing app at ${url} with request: ${userRequest}`)
 
@@ -58,8 +60,8 @@ export async function testAppWithInteraction(
     // Wait for app to load
     await page.waitForTimeout(2000)
     
-    // Generate test based on user request and app context
-    const test = await generateTestFromRequest(userRequest, appContext)
+    // Generate test based on user request, app context, screenshot, and code
+    const test = await generateTestFromRequest(userRequest, appContext, screenshotPath, appCode)
     
     if (!test) {
       logger.warn('Could not generate test for request')
@@ -183,80 +185,112 @@ async function executeStep(page: any, step: InteractionStep): Promise<void> {
   }
 }
 
-async function generateTestFromRequest(userRequest: string, appContext: string): Promise<AppTest | null> {
-  // This would use an LLM to generate appropriate test steps
-  // For now, we'll use pattern matching for common requests
-  
-  const request = userRequest.toLowerCase()
-  
-  // Calculator tests
-  if (appContext.toLowerCase().includes('calculator')) {
-    if (request.includes('add') || request.includes('sumar') || request.includes('+')) {
-      const numbers = extractNumbers(request)
-      if (numbers.length >= 2) {
-        return {
-          description: `Testing calculator: ${numbers[0]} + ${numbers[1]}`,
-          steps: [
-            // Fill first number input
-            { type: 'type', selector: 'input[placeholder*="Number 1"], input[placeholder*="number 1"], input[type="number"]:first-of-type', text: numbers[0].toString() },
-            { type: 'wait', duration: 500 },
-            // Select addition operator
-            { type: 'select', selector: 'select', option: '+', optionText: 'Addition' },
-            { type: 'wait', duration: 500 },
-            // Fill second number input
-            { type: 'type', selector: 'input[placeholder*="Number 2"], input[placeholder*="number 2"], input[type="number"]:last-of-type', text: numbers[1].toString() },
-            { type: 'wait', duration: 500 },
-            // Click calculate button
-            { type: 'click', selector: 'button:has-text("Calculate"), button:has-text("Calculate"), button[onclick*="handleCalculate"]' },
-            { type: 'wait', duration: 1000 }
-          ],
-          waitAfter: 1000
-        }
-      }
+async function generateTestFromRequest(userRequest: string, appContext: string, screenshotPath?: string, appCode?: string): Promise<AppTest | null> {
+  try {
+    const { createLLMProvider } = await import('../codegen/providers')
+    const llm = createLLMProvider()
+    
+    // Prepare context for LLM analysis
+    let analysisContext = `App Context: ${appContext}\nUser Request: ${userRequest}\n`
+    
+    if (screenshotPath) {
+      analysisContext += `Screenshot available at: ${screenshotPath}\n`
     }
     
-    if (request.includes('subtract') || request.includes('restar') || request.includes('-')) {
-      const numbers = extractNumbers(request)
-      if (numbers.length >= 2) {
-        return {
-          description: `Testing calculator: ${numbers[0]} - ${numbers[1]}`,
-          steps: [
-            { type: 'type', selector: 'input[type="number"]:nth-of-type(1)', text: numbers[0].toString() },
-            { type: 'type', selector: 'input[type="number"]:nth-of-type(2)', text: numbers[1].toString() },
-            { type: 'click', selector: 'button:has-text("Subtract"), button:has-text("Resta")' },
-            { type: 'wait', duration: 1000 }
-          ],
-          waitAfter: 1000
-        }
+    if (appCode) {
+      // Truncate code if too long
+      const truncatedCode = appCode.length > 2000 ? appCode.substring(0, 2000) + '...' : appCode
+      analysisContext += `App Code (truncated): ${truncatedCode}\n`
+    }
+    
+    const prompt = [
+      {
+        role: 'system',
+        content: `You are an expert at analyzing web applications and generating automated test steps. 
+
+Given an app context, user request, and optionally a screenshot/code, generate a JSON test plan that will interact with the app and demonstrate its functionality.
+
+Return ONLY valid JSON with this exact structure:
+{
+  "description": "Brief description of what the test will do",
+  "steps": [
+    {
+      "type": "click|type|select|wait|scroll|keyboard",
+      "selector": "CSS selector or description",
+      "text": "text to type (for type actions)",
+      "option": "option value (for select actions)",
+      "optionText": "option text (for select actions)",
+      "direction": "up|down|left|right (for scroll/keyboard)",
+      "duration": 1000 (for wait actions)
+    }
+  ],
+  "waitAfter": 2000
+}
+
+Available action types:
+- click: Click on an element
+- type: Type text into an input field
+- select: Select an option from dropdown
+- wait: Wait for specified duration (ms)
+- scroll: Scroll in direction
+- keyboard: Press keyboard keys
+
+For selectors, use:
+- CSS selectors when possible
+- Text-based selectors like "button:has-text('Calculate')"
+- Generic selectors like "input[type='number']:first-of-type"
+- Multiple fallback selectors separated by commas
+
+Make the test realistic and demonstrate the app's main functionality based on the user's request.`
+      },
+      {
+        role: 'user',
+        content: analysisContext
       }
+    ]
+    
+    const response = await llm.complete({ 
+      messages: prompt, 
+      temperature: 0.3,
+      maxTokens: 1000 
+    })
+    
+    try {
+      const testPlan = JSON.parse(response.content.trim())
+      
+      // Validate the test plan structure
+      if (!testPlan.description || !Array.isArray(testPlan.steps)) {
+        throw new Error('Invalid test plan structure')
+      }
+      
+      // Convert to AppTest format
+      const appTest: AppTest = {
+        description: testPlan.description,
+        steps: testPlan.steps.map((step: any) => ({
+          type: step.type,
+          selector: step.selector || '',
+          text: step.text || '',
+          option: step.option || '',
+          optionText: step.optionText || '',
+          direction: step.direction || 'down',
+          duration: step.duration || 1000
+        })),
+        waitAfter: testPlan.waitAfter || 2000
+      }
+      
+      logger.info(`Generated test plan: ${appTest.description}`)
+      return appTest
+      
+    } catch (parseError) {
+      logger.error('Failed to parse LLM test plan:', parseError)
+      logger.debug('LLM response:', response.content)
+      return null
     }
+    
+  } catch (error) {
+    logger.error('Failed to generate test from LLM:', error)
+    return null
   }
-  
-  // Game tests (Tetris, etc.)
-  if (appContext.toLowerCase().includes('game') || appContext.toLowerCase().includes('tetris')) {
-    return {
-      description: 'Testing game: Waiting for blocks to fall',
-      steps: [
-        { type: 'wait', duration: 5000 }, // Wait for game to start
-      ],
-      waitAfter: 2000
-    }
-  }
-  
-  // Portfolio/Website tests
-  if (appContext.toLowerCase().includes('portfolio') || appContext.toLowerCase().includes('website')) {
-    return {
-      description: 'Testing website: Navigating through pages',
-      steps: [
-        { type: 'wait', duration: 2000 },
-        { type: 'scroll', direction: 'down' },
-        { type: 'wait', duration: 1000 }
-      ],
-      waitAfter: 1000
-    }
-  }
-  
-  return null
 }
 
 function extractNumbers(text: string): number[] {

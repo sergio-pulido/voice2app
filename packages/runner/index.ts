@@ -16,19 +16,10 @@ export async function runApp(task: Task, sandboxPath: string): Promise<RunnerRes
   let url: string = ''
   
   try {
-    // Step 1: Build the app (if needed)
+    // Step 1: Build the app (if needed) - only for non-Vite projects
     const buildResult = await buildApp(sandboxPath, task.jobId)
     
-    if (!buildResult.success) {
-      return {
-        success: false,
-        logs: buildResult.logs,
-        errors: buildResult.errors,
-        buildLogs: buildResult.logs,
-      }
-    }
-    
-    // Step 2: Serve the app
+    // Step 2: Serve the app (this will build Vite projects internally)
     const serveResult = await serveApp(sandboxPath, task.jobId)
     
     if (!serveResult.success || !serveResult.url) {

@@ -2,11 +2,44 @@
  * Notifier package: sends replies to Telegram
  */
 
-import { config, logger, type NotificationPayload } from '../shared'
+import { config, logger, type NotificationPayload, splitMessageForChannel } from '../shared'
 import { textToSpeech } from '../shared/tts'
 import { readFile } from 'fs/promises'
 
 const TELEGRAM_API_BASE = 'https://api.telegram.org/bot'
+
+/**
+ * Send a message with automatic splitting for channel limits
+ */
+async function sendMessageWithSplitting(chatId: number, text: string, channel: string = 'telegram'): Promise<void> {
+  try {
+    const splitResult = await splitMessageForChannel(text, channel)
+    
+    if (splitResult.needsSplitting) {
+      logger.info(`📝 Message split into ${splitResult.messages.length} parts for ${splitResult.channel}`)
+      
+      // Send each message part with a small delay between them
+      for (let i = 0; i < splitResult.messages.length; i++) {
+        const message = splitResult.messages[i]
+        logger.debug(`📤 Sending message part ${i + 1}/${splitResult.messages.length} (${message.length} chars)`)
+        
+        await sendMessage(chatId, message)
+        
+        // Small delay between messages to avoid rate limiting
+        if (i < splitResult.messages.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500))
+        }
+      }
+    } else {
+      // Single message, send normally
+      await sendMessage(chatId, text)
+    }
+  } catch (error) {
+    logger.error('Message splitting failed, sending original message:', error)
+    // Fallback: try to send the original message
+    await sendMessage(chatId, text)
+  }
+}
 
 export async function sendNotification(payload: NotificationPayload): Promise<boolean> {
   logger.info(`📤 Sending notification to chat ${payload.chatId}`)
@@ -47,20 +80,20 @@ export async function sendNotification(payload: NotificationPayload): Promise<bo
           
           // Also send the full text version for reference
           logger.info('📤 Sending text message (full version)...')
-          await sendMessage(payload.chatId, payload.text)
+          await sendMessageWithSplitting(payload.chatId, payload.text, payload.channel || 'telegram')
           logger.success('✅ Text message sent!')
         } catch (voiceError) {
           logger.error('❌ Voice sending failed, using text only:', voiceError)
-          await sendMessage(payload.chatId, payload.text)
+          await sendMessageWithSplitting(payload.chatId, payload.text, payload.channel || 'telegram')
         }
       } else {
         logger.error('❌ TTS returned null/empty buffer - using text only')
-        await sendMessage(payload.chatId, payload.text)
+        await sendMessageWithSplitting(payload.chatId, payload.text, payload.channel || 'telegram')
       }
     } else {
       // Send text message only
       logger.info('📝 Text-only response (no voice)')
-      await sendMessage(payload.chatId, payload.text)
+      await sendMessageWithSplitting(payload.chatId, payload.text, payload.channel || 'telegram')
     }
     
     // Send screenshot or video if provided
@@ -82,6 +115,13 @@ export async function sendNotification(payload: NotificationPayload): Promise<bo
 }
 
 async function sendMessage(chatId: number, text: string): Promise<void> {
+  // Safety check: if message is too long, truncate it
+  const TELEGRAM_MAX_LENGTH = 4096
+  if (text.length > TELEGRAM_MAX_LENGTH) {
+    logger.warn(`Message too long (${text.length} chars), truncating to ${TELEGRAM_MAX_LENGTH} chars`)
+    text = text.substring(0, TELEGRAM_MAX_LENGTH - 100) + '\n\n... (message truncated)'
+  }
+  
   const url = `${TELEGRAM_API_BASE}${config.telegramBotToken}/sendMessage`
   
   const response = await fetch(url, {

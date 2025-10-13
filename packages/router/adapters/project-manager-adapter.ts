@@ -15,6 +15,7 @@ interface ProjectManagerRequest {
   projectId?: number
   searchQuery?: string
   page?: number
+  limit?: number
 }
 
 export class ProjectManagerAdapter {
@@ -24,9 +25,9 @@ export class ProjectManagerAdapter {
       
       const request = await this.parseRequest(input.text, input.userId)
       
-      switch (request.action) {
-        case 'list':
-          return await this.listProjects(input.userId)
+              switch (request.action) {
+                case 'list':
+                  return await this.listProjects(input.userId, request.limit)
         
         case 'details':
           return await this.getProjectDetails(input.userId, request.projectId!)
@@ -73,6 +74,17 @@ export class ProjectManagerAdapter {
       }
     }
     
+    // Check for "last N" requests
+    const lastMatch = lowerText.match(/last\s+(\d+)/)
+    if (lastMatch) {
+      const count = parseInt(lastMatch[1])
+      return {
+        action: 'list',
+        page: 1,
+        limit: count
+      }
+    }
+    
     // Check for "more" or pagination requests
     if (lowerText.includes('more') || lowerText.includes('show more') || lowerText.includes('next page')) {
       const pageMatch = lowerText.match(/page\s*(\d+)/)
@@ -100,7 +112,7 @@ export class ProjectManagerAdapter {
     return { action: 'list' }
   }
 
-  private async listProjects(userId: number): Promise<AdapterOutput> {
+  private async listProjects(userId: number, limit?: number): Promise<AdapterOutput> {
     const projects = await getUserProjects(userId)
     
     if (projects.length === 0) {
@@ -116,8 +128,8 @@ export class ProjectManagerAdapter {
     // Sort by creation date (newest first)
     projects.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     
-    // Initialize pagination to first page, pageSize 100
-    const pageSize = 100
+    // Use limit if specified, otherwise default to 100
+    const pageSize = limit || 100
     const page = 1
     setUserProjectListState(String(userId), page, pageSize)
     const displayProjects = projects.slice(0, pageSize)

@@ -11,6 +11,8 @@ interface UserSession {
   appContext?: string
   jobId?: string
   sandboxPath?: string
+  screenshotPath?: string
+  appCode?: string
   lastUpdated: number
 }
 
@@ -34,7 +36,9 @@ export function setUserAppSession(
   appUrl: string,
   appContext: string,
   jobId: string,
-  sandboxPath?: string
+  sandboxPath?: string,
+  screenshotPath?: string,
+  appCode?: string
 ): void {
   logger.debug(`Setting app session for user ${userId}: ${appUrl}`)
   
@@ -44,6 +48,8 @@ export function setUserAppSession(
     appContext,
     jobId,
     sandboxPath,
+    screenshotPath,
+    appCode,
     lastUpdated: Date.now()
   })
 }

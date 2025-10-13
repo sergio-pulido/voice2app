@@ -67,37 +67,113 @@ export async function serveApp(sandboxPath: string, jobId: string): Promise<Serv
       return { success: false, logs, errors }
     }
     
-    // Start dev server with Vite
-    // Vite uses port 5173 by default, or we can configure it
-    const port = 3000 + Math.floor(Math.random() * 1000)
-    
-    const serverProcess = spawn('bun', ['run', 'dev', '--port', port.toString(), '--host', '0.0.0.0'], {
+    // Install dependencies first
+    logger.job(jobId, 'Installing dependencies...')
+    const installProcess = spawn('bun', ['install'], {
       cwd: sandboxPath,
       shell: true,
     })
     
-    let serverReady = false
+    let installSuccess = false
+    await new Promise<void>((resolve, reject) => {
+      installProcess.on('close', (code) => {
+        if (code === 0) {
+          installSuccess = true
+          resolve()
+        } else {
+          reject(new Error(`Dependency installation failed with code ${code}`))
+        }
+      })
+    })
+    
+    if (!installSuccess) {
+      errors.push('Dependency installation failed')
+      return { success: false, logs, errors }
+    }
+    
+    // Build the app, then serve static files
+    logger.job(jobId, 'Building app...')
+    const buildProcess = spawn('bun', ['run', 'build'], {
+      cwd: sandboxPath,
+      shell: true,
+    })
+    
+    let buildSuccess = false
+    const buildLogs: string[] = []
+    
+    buildProcess.stdout?.on('data', (data) => {
+      const output = data.toString()
+      buildLogs.push(output)
+      logs.push(`[BUILD] ${output}`)
+    })
+    
+    buildProcess.stderr?.on('data', (data) => {
+      const output = data.toString()
+      buildLogs.push(output)
+      logs.push(`[BUILD] ${output}`)
+    })
+    
+    // Wait for build to complete
+    await new Promise<void>((resolve, reject) => {
+      buildProcess.on('close', (code) => {
+        if (code === 0) {
+          buildSuccess = true
+          resolve()
+        } else {
+          reject(new Error(`Build failed with code ${code}`))
+        }
+      })
+    })
+    
+    if (!buildSuccess) {
+      errors.push('Build failed')
+      return { success: false, logs, errors }
+    }
+    
+    // Check if dist folder exists
+    const distPath = join(sandboxPath, 'dist')
+    try {
+      await access(distPath)
+    } catch {
+      errors.push('Build completed but dist folder not found')
+      return { success: false, logs, errors }
+    }
+    
+    // Start static file server
+    const port = 3000 + Math.floor(Math.random() * 1000)
     const url = `http://localhost:${port}`
+    
+    const serverProcess = spawn('python3', ['-m', 'http.server', port.toString(), '--bind', '0.0.0.0'], {
+      cwd: distPath,
+      shell: true,
+    })
+    
+    let serverReady = false
     
     serverProcess.stdout?.on('data', (data) => {
       const output = data.toString()
-      logs.push(output)
-      // Detect when Vite is ready
-      if (output.includes('Local:') || output.includes('localhost') || output.includes('ready in') || output.includes('dev server running')) {
+      logs.push(`[SERVER] ${output}`)
+      // Python http.server is ready when it starts listening
+      if (output.includes('Serving HTTP') || output.includes('port')) {
         serverReady = true
       }
     })
     
     serverProcess.stderr?.on('data', (data) => {
-      errors.push(data.toString())
+      const output = data.toString()
+      logs.push(`[SERVER] ${output}`)
+      // Python http.server logs to stderr, but it's not an error
+      if (output.includes('Serving HTTP') || output.includes('port')) {
+        serverReady = true
+      }
     })
     
-    // Wait for server to be ready with exponential backoff
-    const maxWaitTime = 15000 // 15 seconds max
+    // Wait for server to be ready
+    const maxWaitTime = 5000 // 5 seconds max for static server
     const startTime = Date.now()
     
     while (!serverReady && (Date.now() - startTime) < maxWaitTime) {
-      await new Promise((resolve) => setTimeout(resolve, 500))
+      await new Promise((resolve) => setTimeout(resolve, 200))
       
       // Also try to connect to the port
       try {
@@ -112,7 +188,7 @@ export async function serveApp(sandboxPath: string, jobId: string): Promise<Serv
     }
     
     if (!serverReady) {
-      logger.warn(`Server may not be fully ready after ${maxWaitTime}ms, proceeding anyway`)
+      logger.warn(`Static server may not be fully ready after ${maxWaitTime}ms, proceeding anyway`)
     }
     
     return {

@@ -92,6 +92,7 @@ export async function orchestrate(options: OrchestrateOptions): Promise<void> {
       text: customerMessage,
       screenshot: result.attachments?.[0], // First attachment if any
       voice: !!voiceBuffer,  // Send voice response if input was voice
+      channel: platform,
       discordToken
     })
     

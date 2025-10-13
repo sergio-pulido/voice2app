@@ -32,7 +32,7 @@ export class AppInteractionAdapter implements Adapter {
       // Update session timestamp
       updateSessionTimestamp(input.userId)
       
-      const { appUrl, appContext, jobId, sandboxPath } = session
+      const { appUrl, appContext, jobId, sandboxPath, screenshotPath, appCode } = session
       
       // Clean up numbered requests (e.g., "1. add 3+56" → "add 3+56")
       let cleanRequest = input.text || ''
@@ -95,7 +95,9 @@ export class AppInteractionAdapter implements Adapter {
         workingUrl,
         jobId,
         cleanRequest,
-        appContext
+        appContext,
+        screenshotPath,
+        appCode
       )
       
       if (!videoPath) {

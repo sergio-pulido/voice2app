@@ -3,52 +3,45 @@
  */
 
 import { logger } from '../../shared/logger'
+import { createLLMProvider } from '../../codegen/providers'
 
 const MYMEMORY_BASE = 'https://api.mymemory.translated.net'
 
 /**
- * Detect language using simple heuristics + MyMemory
+ * Detect language using LLM (accurate and reliable)
  */
 export async function detectLanguage(text: string): Promise<string> {
   try {
     logger.debug(`🔍 Detecting language for: "${text.substring(0, 50)}..."`)
     
-    // Simple heuristic detection for common languages
-    const sample = text.toLowerCase().substring(0, 200)
+    const llm = createLLMProvider()
     
-    // German indicators
-    if (sample.match(/\b(der|die|das|und|ist|nicht|zu|den|ein|eine|ich|sie|er)\b/)) {
-      logger.debug(`🌍 Detected language: de (German)`)
-      return 'de'
-    }
+    const prompt = `Detect the language of the following text and respond with ONLY the ISO 639-1 language code (e.g., "en" for English, "es" for Spanish, "fr" for French, "de" for German, "pt" for Portuguese, "it" for Italian, etc.).
+
+Text: "${text}"
+
+Language code:`
+
+    const response = await llm.complete({
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a language detection expert. Respond with ONLY the ISO 639-1 two-letter language code, nothing else.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.1,
+      maxTokens: 10
+    })
     
-    // Spanish indicators
-    if (sample.match(/\b(el|la|los|las|de|que|es|en|por|para|con|una|uno)\b/)) {
-      logger.debug(`🌍 Detected language: es (Spanish)`)
-      return 'es'
-    }
+    // Extract the language code (should be 2 letters)
+    const langCode = response.content.trim().toLowerCase().substring(0, 2)
     
-    // French indicators
-    if (sample.match(/\b(le|la|les|de|un|une|est|dans|pour|avec|ce|qui)\b/)) {
-      logger.debug(`🌍 Detected language: fr (French)`)
-      return 'fr'
-    }
-    
-    // Italian indicators
-    if (sample.match(/\b(il|lo|la|di|che|un|una|per|con|come|sono)\b/)) {
-      logger.debug(`🌍 Detected language: it (Italian)`)
-      return 'it'
-    }
-    
-    // Portuguese indicators
-    if (sample.match(/\b(o|a|os|as|de|que|um|uma|para|com|não|são)\b/)) {
-      logger.debug(`🌍 Detected language: pt (Portuguese)`)
-      return 'pt'
-    }
-    
-    // Default to English
-    logger.debug(`🌍 Detected language: en (English - default)`)
-    return 'en'
+    logger.debug(`🌍 Detected language: ${langCode}`)
+    return langCode
   } catch (error) {
     logger.warn('Language detection failed, defaulting to English:', error)
     return 'en'

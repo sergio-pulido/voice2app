@@ -10,6 +10,7 @@ import { runApp } from '../../runner'
 import { analyzeResults } from '../../analyzer'
 import { setUserAppSession } from '../services/session-store'
 import { addProject } from '../../shared/project-db'
+import { createLLMProvider } from '../../codegen/providers'
 import type { Adapter, AdapterInput, AdapterOutput } from '../types'
 
 export class AppCodeAdapter implements Adapter {
@@ -103,9 +104,9 @@ export class AppCodeAdapter implements Adapter {
       // Add interactive choices for successful apps
       if (analysisResult.status === 'success' && runnerResult.url) {
         message += `🎮 What would you like to do next?\n\n`
-        message += `1️⃣ Test the app - Ask me to interact with it (e.g., "add 2+5", "play the game")\n`
-        message += `2️⃣ Close - We're done here\n\n`
-        message += `Just tell me what you want to test! 🚀\n\n`
+        // message += `1️⃣ Test the app - Ask me to interact with it (e.g., "add 2+5", "play the game")\n`
+        // message += `2️⃣ Close - We're done here\n\n`
+        // message += `Just tell me what you want to test! 🚀\n\n`
       } else {
         if (analysisResult.suggestions.length > 0) {
           message += `💡 Suggestions:\n`
@@ -121,20 +122,53 @@ export class AppCodeAdapter implements Adapter {
       
       // Store session data for interactive testing
       if (analysisResult.status === 'success' && runnerResult.url) {
+        // Try to read the main app code for better test generation
+        let appCode: string | undefined
+        try {
+          const { readFile } = await import('fs/promises')
+          const { join } = await import('path')
+          const appCodePath = join(codegenResult.sandboxPath, 'src', 'App.tsx')
+          appCode = await readFile(appCodePath, 'utf-8')
+        } catch (error) {
+          // App code not available, continue without it
+          logger.debug('Could not read app code for session:', error)
+        }
+        
         setUserAppSession(
           input.userId,
           runnerResult.url,
           task.context,
           task.jobId,
-          codegenResult.sandboxPath
+          codegenResult.sandboxPath,
+          runnerResult.screenshot,
+          appCode
         )
       }
       
       // Save project to database
       try {
         const folderName = codegenResult.sandboxPath.split('/').pop() || task.jobId
-        const title = this.extractTitle(task.context)
-        const description = this.extractDescription(task.context)
+        let title = this.extractTitle(task.context)
+        let description = this.extractDescription(task.context)
+        let summary = analysisResult.summary
+
+        // Enrich metadata with LLM if needed
+        try {
+          const llm = createLLMProvider()
+          const prompt = [
+            { role: 'system', content: 'You generate concise metadata for an app project log. Return strict JSON with keys: title (≤60 chars), description (one short line ≤140 chars), summary (2-4 sentences). Do not include markdown, backticks, or extra text.' },
+            { role: 'user', content: `Task context: ${task.context}\nStatus: ${analysisResult.status}\nAnalysis summary: ${analysisResult.summary || 'N/A'}\nBuild errors: ${(runnerResult.errors || []).join('\n').slice(0, 1000)}` }
+          ]
+          const completion = await llm.complete({ messages: prompt, temperature: 0.2, maxTokens: 300 })
+          try {
+            const parsed = JSON.parse(completion.content.trim()) as { title?: string; description?: string; summary?: string }
+            if (parsed.title) title = parsed.title
+            if (parsed.description) description = parsed.description
+            if (parsed.summary) summary = parsed.summary
+          } catch {}
+        } catch (e) {
+          // LLM unavailable, proceed with extracted values
+        }
         
         await addProject({
           jobId: task.jobId,
@@ -142,7 +176,7 @@ export class AppCodeAdapter implements Adapter {
           userId: input.userId,
           title,
           description,
-          summary: analysisResult.summary,
+          summary,
           screenshotPath: runnerResult.screenshot,
           publicUrl: runnerResult.publicUrl,
           status: analysisResult.status
