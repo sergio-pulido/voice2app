@@ -12,6 +12,19 @@ export interface TTSOptions {
 }
 
 /**
+ * Clean text for TTS by removing invalid Unicode characters
+ */
+function cleanTextForTTS(text: string): string {
+  // Remove invalid Unicode characters and control characters
+  return text
+    .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Remove control characters
+    .replace(/[\uD800-\uDFFF]/g, '') // Remove invalid UTF-16 surrogate pairs
+    .replace(/[^\x20-\x7E\u00A0-\uFFFF]/g, '') // Keep only printable ASCII and valid Unicode
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .trim()
+}
+
+/**
  * Convert text to speech using ElevenLabs TTS
  * Returns an audio buffer that can be sent to Telegram
  */
@@ -78,8 +91,13 @@ async function tryElevenLabsTTS(text: string, voiceId: string, modelId: string, 
         } else if (is500Error && attempt < maxRetries) {
           logger.warn(`⚠️ ElevenLabs server error (${response.status}), retrying (${attempt}/${maxRetries})...`)
           logger.warn(`🔍 Error details: ${errorText}`)
-          await new Promise(resolve => setTimeout(resolve, 1000))
+          // For 500 errors, wait longer between retries
+          await new Promise(resolve => setTimeout(resolve, 2000 * attempt))
           continue
+        } else if (is500Error) {
+          logger.error(`❌ ElevenLabs server error (${response.status}) after ${maxRetries} attempts`)
+          logger.error(`🔍 Final error details: ${errorText}`)
+          return null
         }
         
         logger.error(`❌ ElevenLabs TTS error (${response.status}): ${errorText}`)
@@ -128,6 +146,13 @@ async function tryOpenAITTS(text: string): Promise<Buffer | null> {
 
     logger.info('🎤 Trying OpenAI TTS as fallback...')
 
+    // Clean the text before sending to OpenAI
+    const cleanText = cleanTextForTTS(text)
+    if (!cleanText) {
+      logger.warn('⚠️ Text is empty after cleaning - skipping OpenAI TTS')
+      return null
+    }
+
     const response = await fetch('https://api.openai.com/v1/audio/speech', {
       method: 'POST',
       headers: {
@@ -137,7 +162,7 @@ async function tryOpenAITTS(text: string): Promise<Buffer | null> {
       body: JSON.stringify({
         model: 'tts-1',
         voice: 'alloy',
-        input: text,
+        input: cleanText,
         speed: 1.1
       })
     })
@@ -166,7 +191,12 @@ async function tryGoogleTTS(text: string): Promise<Buffer | null> {
     logger.info('🎤 Trying Google TTS (free fallback)...')
 
     // Use Google's free TTS API (no authentication required)
-    const encodedText = encodeURIComponent(text.substring(0, 200)) // Limit to 200 chars for free tier
+    const cleanText = cleanTextForTTS(text)
+    if (!cleanText) {
+      logger.warn('⚠️ Text is empty after cleaning - skipping Google TTS')
+      return null
+    }
+    const encodedText = encodeURIComponent(cleanText.substring(0, 200)) // Limit to 200 chars for free tier
     const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodedText}&tl=en&client=tw-ob`
     
     const response = await fetch(url, {

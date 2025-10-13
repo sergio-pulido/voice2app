@@ -123,3 +123,46 @@ export async function generateImageWithRetry(
   return null
 }
 
+/**
+ * Generate image with multiple model fallbacks
+ */
+export async function generateImageWithModelFallbacks(
+  prompt: string,
+  maxRetries: number = 2
+): Promise<string | null> {
+  // List of models to try in order of preference
+  const fallbackModels = [
+    config.imageModel, // Primary model from config
+    'stabilityai/stable-diffusion-xl-base-1.0', // Reliable fallback
+    'stabilityai/stable-diffusion-3-medium-diffusers', // Newer model
+    'black-forest-labs/FLUX.1-dev' // High quality alternative
+  ]
+  
+  // Remove duplicates while preserving order
+  const uniqueModels = [...new Set(fallbackModels)]
+  
+  for (const model of uniqueModels) {
+    logger.info(`🎨 Trying model: ${model}`)
+    
+    // Temporarily override the config model
+    const originalModel = config.imageModel
+    config.imageModel = model
+    
+    try {
+      const result = await generateImageWithRetry(prompt, maxRetries)
+      if (result) {
+        logger.success(`✅ Success with model: ${model}`)
+        return result
+      }
+    } catch (error: any) {
+      logger.warn(`❌ Model ${model} failed: ${error.message}`)
+    } finally {
+      // Restore original model
+      config.imageModel = originalModel
+    }
+  }
+  
+  logger.error(`❌ All models failed for prompt: ${prompt}`)
+  return null
+}
+

@@ -25,6 +25,8 @@ export class ProjectManagerAdapter {
       
       const request = await this.parseRequest(input.text, input.userId)
       
+      logger.debug(`📁 Parsed request: action=${request.action}, limit=${request.limit}, page=${request.page}`)
+      
               switch (request.action) {
                 case 'list':
                   return await this.listProjects(input.userId, request.limit)
@@ -39,7 +41,7 @@ export class ProjectManagerAdapter {
           return await this.getProjectStats(input.userId)
         
         case 'more':
-          return await this.listMoreProjects(input.userId, request.page || 1)
+          return await this.listMoreProjects(input.userId, request.page)
         
         default:
           return {
@@ -74,10 +76,25 @@ export class ProjectManagerAdapter {
       }
     }
     
-    // Check for "last N" requests
+    // Check for "last N" requests (both numbers and words)
     const lastMatch = lowerText.match(/last\s+(\d+)/)
+    const lastWordMatch = lowerText.match(/last\s+(one|two|three|four|five|six|seven|eight|nine|ten)/)
+    
     if (lastMatch) {
       const count = parseInt(lastMatch[1])
+      logger.debug(`📁 Found "last N" pattern: "${lastMatch[0]}" -> count=${count}`)
+      return {
+        action: 'list',
+        page: 1,
+        limit: count
+      }
+    } else if (lastWordMatch) {
+      const wordToNumber: { [key: string]: number } = {
+        'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
+        'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10
+      }
+      const count = wordToNumber[lastWordMatch[1]]
+      logger.debug(`📁 Found "last word" pattern: "${lastWordMatch[0]}" -> count=${count}`)
       return {
         action: 'list',
         page: 1,
@@ -90,7 +107,7 @@ export class ProjectManagerAdapter {
       const pageMatch = lowerText.match(/page\s*(\d+)/)
       return {
         action: 'more',
-        page: pageMatch ? parseInt(pageMatch[1]) : 1
+        page: pageMatch ? parseInt(pageMatch[1]) : undefined // Don't specify page, let listMoreProjects use stored state
       }
     }
     
@@ -106,6 +123,16 @@ export class ProjectManagerAdapter {
     // Check for statistics
     if (lowerText.includes('stat') || lowerText.includes('summary') || lowerText.includes('overview')) {
       return { action: 'stats' }
+    }
+    
+    // Check for any "last" requests that might have been missed
+    if (lowerText.includes('last') && (lowerText.includes('project') || lowerText.includes('app'))) {
+      logger.debug(`📁 Found "last" request but no specific number, defaulting to 5`)
+      return {
+        action: 'list',
+        page: 1,
+        limit: 5
+      }
     }
     
     // Default to list
@@ -134,16 +161,12 @@ export class ProjectManagerAdapter {
     setUserProjectListState(String(userId), page, pageSize)
     const displayProjects = projects.slice(0, pageSize)
     
+    logger.debug(`Project list: limit=${limit}, pageSize=${pageSize}, total=${projects.length}, showing=${displayProjects.length}`)
+    
     let message = `📁 **Your Projects** (${projects.length} total)\n\n`
     
-    displayProjects.forEach((project, index) => {
-      const statusEmoji = project.status === 'success' ? '✅' : 
-                         project.status === 'partial' ? '⚠️' : '❌'
-      const date = new Date(project.createdAt).toLocaleDateString()
-      
-      message += `${statusEmoji} **ID ${project.id}**: ${project.title}\n`
-      message += `   📅 ${date} | 📁 ${project.folderName}\n\n`
-    })
+    // Use the shared formatting function
+    message += this.formatProjectsList(displayProjects)
     
     // Add note if there are more projects
     if (projects.length > pageSize) {
@@ -169,7 +192,7 @@ export class ProjectManagerAdapter {
     }
   }
 
-  private async listMoreProjects(userId: number, page: number): Promise<AdapterOutput> {
+  private async listMoreProjects(userId: number, page?: number): Promise<AdapterOutput> {
     const projects = await getUserProjects(userId)
     
     if (projects.length === 0) {
@@ -185,9 +208,11 @@ export class ProjectManagerAdapter {
     // Sort by creation date (newest first)
     projects.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     
-    // Determine page and pageSize from stored state (defaults: 100)
+    // Get current state from storage
     const stored = getUserProjectListState(String(userId))
     const pageSize = stored?.pageSize || 100
+    
+    // If no page specified, use the stored page (this is the key fix!)
     const currentPage = page || stored?.page || 1
     const startIndex = (currentPage - 1) * pageSize
     const endIndex = Math.min(projects.length, startIndex + pageSize)
@@ -195,7 +220,7 @@ export class ProjectManagerAdapter {
     
     if (displayProjects.length === 0) {
       return {
-        summaryText: `📁 **Page ${page}**\n\nNo more projects to show. You've reached the end of your project list! 🎯`,
+        summaryText: `📁 **Page ${currentPage}**\n\nNo more projects to show. You've reached the end of your project list! 🎯`,
         metadata: {
           category: 'project_manager',
           status: 'success'
@@ -208,12 +233,8 @@ export class ProjectManagerAdapter {
 
     let message = `📁 **Your Projects - Page ${currentPage}** (${projects.length} total)\n\n`
     
-    displayProjects.forEach((project) => {
-      const statusEmoji = project.status === 'success' ? '✅' : 
-                         project.status === 'partial' ? '⚠️' : '❌'
-      const date = new Date(project.createdAt).toLocaleDateString()
-      message += `${statusEmoji} ID ${project.id} • ${project.title} • ${date} • ${project.folderName}\n`
-    })
+    // Use the shared formatting function for consistency
+    message += this.formatProjectsList(displayProjects)
     
     message += `💡 **Commands:**\n`
     message += `• "Show project details for ID X" - Get full details\n`
@@ -230,6 +251,26 @@ export class ProjectManagerAdapter {
         status: 'success'
       }
     }
+  }
+
+  /**
+   * Shared function to format project list display
+   * Uses the better formatting from listProjects
+   */
+  private formatProjectsList(projects: any[]): string {
+    let formatted = ''
+    
+    projects.forEach((project) => {
+      const statusEmoji = project.status === 'success' ? '✅' : 
+                         project.status === 'partial' ? '⚠️' : '❌'
+      const date = new Date(project.createdAt).toLocaleDateString()
+      
+      formatted += `${statusEmoji} **ID ${project.id}**: ${project.title}\n`
+      formatted += `   📅 ${date}\n`
+      formatted += `\n`
+    })
+    
+    return formatted
   }
 
   private async getProjectDetails(userId: number, projectId: number): Promise<AdapterOutput> {

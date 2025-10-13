@@ -24,7 +24,18 @@ async function createCloudflaredTunnel(port: string, jobId: string): Promise<Tun
     
     const cfProcess = spawn('cloudflared', ['tunnel', '--url', `http://localhost:${port}`, '--no-autoupdate'], {
       stdio: ['ignore', 'pipe', 'pipe'],
-      detached: false // Keep the process attached to prevent it from closing
+      detached: false, // Keep the process attached to prevent it from closing
+      killSignal: 'SIGTERM' // Use SIGTERM instead of SIGKILL for graceful shutdown
+    })
+    
+    // Add process error handling
+    cfProcess.on('error', (error) => {
+      logger.error(`Cloudflared process error:`, error)
+    })
+    
+    cfProcess.on('exit', (code, signal) => {
+      logger.warn(`Cloudflared process exited with code ${code}, signal ${signal}`)
+      activeTunnels.delete(jobId)
     })
     
     // Wait for cloudflared to provide the public URL
@@ -56,10 +67,41 @@ async function createCloudflaredTunnel(port: string, jobId: string): Promise<Tun
     activeTunnels.set(jobId, { url: publicUrl, process: cfProcess })
     logger.success(`🌐 Public URL: ${publicUrl}`)
     
-    return {
-      success: true,
-      publicUrl,
-      process: cfProcess
+    // Give tunnel time to stabilize
+    logger.job(jobId, 'Waiting for tunnel to stabilize...')
+    await new Promise(resolve => setTimeout(resolve, 3000))
+    
+    // Verify tunnel is working by testing the public URL
+    logger.job(jobId, 'Verifying tunnel connectivity...')
+    try {
+      const response = await fetch(publicUrl, { 
+        method: 'HEAD',
+        signal: AbortSignal.timeout(10000) // 10 second timeout
+      })
+      
+      if (response.ok || response.status === 200) {
+        logger.success(`✅ Tunnel verified and working`)
+        return {
+          success: true,
+          publicUrl,
+          process: cfProcess
+        }
+      } else {
+        logger.warn(`⚠️ Tunnel created but returned status ${response.status}`)
+        return {
+          success: true, // Still return success as tunnel was created
+          publicUrl,
+          process: cfProcess
+        }
+      }
+    } catch (error) {
+      logger.warn(`⚠️ Tunnel created but verification failed: ${error}`)
+      // Still return success as tunnel was created, but log the warning
+      return {
+        success: true,
+        publicUrl,
+        process: cfProcess
+      }
     }
   } catch (error: any) {
     logger.error(`Failed to create cloudflared tunnel:`, error)
@@ -215,7 +257,13 @@ export function stopTunnel(jobId: string): boolean {
   
   if (tunnel) {
     try {
-      tunnel.process.kill()
+      tunnel.process.kill('SIGTERM')
+      // Give process time to exit gracefully
+      setTimeout(() => {
+        if (!tunnel.process.killed) {
+          tunnel.process.kill('SIGKILL')
+        }
+      }, 5000)
       activeTunnels.delete(jobId)
       logger.info(`Stopped tunnel for job ${jobId}`)
       return true
@@ -226,6 +274,21 @@ export function stopTunnel(jobId: string): boolean {
   }
   
   return false
+}
+
+/**
+ * Clean up all active tunnels
+ */
+export function cleanupAllTunnels(): void {
+  logger.info(`Cleaning up ${activeTunnels.size} active tunnels...`)
+  for (const [jobId, tunnel] of activeTunnels.entries()) {
+    try {
+      tunnel.process.kill('SIGTERM')
+    } catch (error) {
+      logger.debug(`Error killing tunnel ${jobId}:`, error)
+    }
+  }
+  activeTunnels.clear()
 }
 
 /**

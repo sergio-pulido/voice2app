@@ -42,7 +42,6 @@ dev:
 
 # Start server only
 server:
-	@echo "🚀 Starting server..."
 	@make kill-server 2>/dev/null || true
 	@bun run server.ts
 

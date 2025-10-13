@@ -1,13 +1,16 @@
 import { Hono } from 'hono'
 import telegramGateway from './packages/telegram-gateway'
 import discordGateway from './packages/discord-gateway'
-import { logger } from './packages/shared'
+import { logger, showStartupBanner, showMainBanner, showColorizedBanner, showSuccessBanner, showShutdownBanner } from './packages/shared'
 
 // Load environment variables from .env file
 import { config } from 'dotenv'
 config()
 
 const PORT = 3020
+
+// Show startup banner
+showColorizedBanner()
 
 // Create main app and mount both gateways
 const app = new Hono()
@@ -31,8 +34,18 @@ const server = Bun.serve({
   fetch: app.fetch,
 })
 
-logger.success(`🚀 Voice2App Gateway started on http://localhost:${server.port}`)
-logger.info('📡 Waiting for messages from Telegram and Discord...')
-logger.info('   • Telegram: POST /telegram')
-logger.info('   • Discord: POST /discord')
-logger.info('   • Health: GET /health')
+// Show success banner with server info
+showSuccessBanner(server.port)
+
+// Add graceful shutdown handling
+process.on('SIGINT', () => {
+  console.log('\n')
+  showShutdownBanner()
+  process.exit(0)
+})
+
+process.on('SIGTERM', () => {
+  console.log('\n')
+  showShutdownBanner()
+  process.exit(0)
+})

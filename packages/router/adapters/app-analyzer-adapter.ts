@@ -7,6 +7,7 @@ import { serveApp } from '../../runner/server'
 import { captureScreenshot } from '../../runner/screenshot'
 import { createTunnel } from '../../runner/tunnel'
 import { createLLMProvider } from '../../codegen/providers'
+import { APP_ANALYSIS_PROMPT } from '../../shared/prompts'
 import { readFile } from 'fs/promises'
 import { join } from 'path'
 import { updateProject } from '../../shared/project-db'
@@ -165,6 +166,37 @@ export class AppAnalyzerAdapter implements Adapter {
         }
       }
       
+      // Wait a bit more for server to be fully ready
+      logger.info(`⏳ Waiting for server to be fully ready...`)
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      
+      // Test server readiness with multiple attempts
+      let serverReady = false
+      for (let i = 0; i < 5; i++) {
+        try {
+          const response = await fetch(serveResult.url, { 
+            signal: AbortSignal.timeout(3000),
+            method: 'HEAD'
+          })
+          if (response.ok || response.status === 200) {
+            serverReady = true
+            break
+          }
+        } catch (e) {
+          logger.debug(`Server readiness check ${i + 1}/5 failed, retrying...`)
+          await new Promise(resolve => setTimeout(resolve, 1000))
+        }
+      }
+      
+      if (!serverReady) {
+        return {
+          success: false,
+          errors: ['Server is not responding after multiple attempts']
+        }
+      }
+      
+      logger.info(`✅ Server is ready, creating tunnel...`)
+      
       // Create public URL
       const tunnelResult = await createTunnel(serveResult.url, `analyze_${project.id}`)
       
@@ -216,26 +248,7 @@ export class AppAnalyzerAdapter implements Adapter {
     const prompt = [
       {
         role: 'system',
-        content: `You are an expert at analyzing web applications and generating accurate project metadata.
-
-TASK: Analyze the provided app and generate proper title, description, and summary.
-
-RULES:
-1. Look at the screenshot to understand what the app actually does
-2. If app code is provided, analyze the functionality
-3. Generate a concise, accurate title (≤60 chars)
-4. Write a one-line description (≤140 chars) 
-5. Create a 2-4 sentence summary explaining the app's purpose and features
-6. Be specific about the app's functionality, not generic
-7. If the current metadata is just placeholder text, replace it with real analysis
-
-CRITICAL: Return ONLY valid JSON. Do not include markdown backticks, explanations, or any other text. Just the JSON object.
-
-{
-  "title": "Accurate app title",
-  "description": "One-line description of what the app does",
-  "summary": "2-4 sentences explaining the app's purpose and key features"
-}`
+        content: APP_ANALYSIS_PROMPT
       },
       {
         role: 'user',

@@ -90,7 +90,9 @@ RULES:
 7. Maintain the original tone and formatting
 8. Keep code blocks, links, and special formatting intact when possible
 
-Return ONLY a JSON array of strings, one message per element. No other text or explanation.`
+CRITICAL: Return ONLY a valid JSON array of strings. Do not include markdown backticks, explanations, or any other text. Just the JSON array.
+
+Example: ["Part 1 content...", "...Part 2 content"]`
       },
       {
         role: 'user',
@@ -107,7 +109,23 @@ ${message}`
     })
     
     try {
-      const messages = JSON.parse(response.content.trim())
+      // Clean the response - remove any markdown backticks or extra text
+      let cleanResponse = response.content.trim()
+      
+      // Remove markdown code blocks if present
+      if (cleanResponse.startsWith('```json')) {
+        cleanResponse = cleanResponse.replace(/^```json\s*/, '').replace(/\s*```$/, '')
+      } else if (cleanResponse.startsWith('```')) {
+        cleanResponse = cleanResponse.replace(/^```\s*/, '').replace(/\s*```$/, '')
+      }
+      
+      // Remove any leading/trailing text that's not JSON
+      const jsonMatch = cleanResponse.match(/\[[\s\S]*\]/)
+      if (jsonMatch) {
+        cleanResponse = jsonMatch[0]
+      }
+      
+      const messages = JSON.parse(cleanResponse)
       
       if (!Array.isArray(messages) || messages.length === 0) {
         throw new Error('Invalid response format')
