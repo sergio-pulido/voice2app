@@ -11,4 +11,5 @@ export { translateAdapter } from './translate-adapter'
 export { helpAdapter } from './help-adapter'
 export { friendAdapter } from './friend-adapter'
 export { projectManagerAdapter } from './project-manager-adapter'
+export { appAnalyzerAdapter } from './app-analyzer-adapter'
 

@@ -4,7 +4,7 @@
 
 import { logger } from '../shared'
 
-export type IntentCategory = 'qa' | 'app_code' | 'app_interaction' | 'image_gen' | 'video_gen' | 'translate' | 'help' | 'friend' | 'project_manager'
+export type IntentCategory = 'qa' | 'app_code' | 'app_interaction' | 'image_gen' | 'video_gen' | 'translate' | 'help' | 'friend' | 'project_manager' | 'app_analyzer'
 
 export interface IntentResult {
   category: IntentCategory
@@ -66,7 +66,16 @@ async function llmClassify(text: string): Promise<IntentResult> {
     }
   }
   
-  // PRIORITY 2: Project management
+  // PRIORITY 2: App analysis
+  if (/\b(analyze|complete|details|run|test|screenshot|what is|what does)\b/i.test(lowerText) && /\b(project|app)\b/i.test(lowerText)) {
+    return {
+      category: 'app_analyzer',
+      confidence: 0.8,
+      reasoning: 'App analysis request detected (fallback)'
+    }
+  }
+  
+  // PRIORITY 3: Project management
   if (/\b(list|show|view|my projects|project history|project details|project stats|search for|find my|my apps)\b/i.test(lowerText)) {
     return {
       category: 'project_manager',
@@ -75,7 +84,7 @@ async function llmClassify(text: string): Promise<IntentResult> {
     }
   }
   
-  // PRIORITY 3: Translation
+  // PRIORITY 4: Translation
   if (/\b(translate|traduce|tradueix|how do you say|cómo se dice)\b/i.test(lowerText)) {
     return {
       category: 'translate',
@@ -84,7 +93,7 @@ async function llmClassify(text: string): Promise<IntentResult> {
     }
   }
   
-  // PRIORITY 4: Greetings/casual (only if NO command detected)
+  // PRIORITY 5: Greetings/casual (only if NO command detected)
   if (/\b(hello|hi|hey|hola|good morning|buenos días|how are you|cómo estás)\b/i.test(lowerText)) {
     return {
       category: 'friend',
@@ -93,7 +102,7 @@ async function llmClassify(text: string): Promise<IntentResult> {
     }
   }
   
-  // PRIORITY 4: Default to Q&A for questions
+  // PRIORITY 6: Default to Q&A for questions
   return {
     category: 'qa',
     confidence: 0.6,
@@ -157,10 +166,11 @@ async function openaiClassify(text: string): Promise<IntentResult> {
 
 ⚠️ CRITICAL PRIORITY ORDER:
 1. COMMANDS (image_gen, video_gen, app_code, translate) - If user wants to CREATE/GENERATE/BUILD/MAKE something, this ALWAYS takes priority!
-2. Project management (project_manager) - Managing existing projects
-3. Help requests
-4. Factual questions (qa)
-5. Casual conversation (friend) - ONLY if purely social with NO action requested
+2. App analysis (app_analyzer) - Analyzing existing apps to complete details
+3. Project management (project_manager) - Managing existing projects
+4. Help requests
+5. Factual questions (qa)
+6. Casual conversation (friend) - ONLY if purely social with NO action requested
 
 📋 CATEGORIES:
 
@@ -202,6 +212,11 @@ async function openaiClassify(text: string): Promise<IntentResult> {
 **"friend"** - PURELY casual conversation, greetings, small talk, personal chat (NO commands or questions)
    ✅ "Hello!", "How are you?", "What's up?", "Good morning", "Thanks!", "You're cool", "I'm tired"
    ❌ NOT if they want something created/generated/built/translated
+
+**"app_analyzer"** - Analyzing existing apps to complete project details, running apps, taking screenshots
+   🎯 Keywords: analyze, complete, details, run, test, screenshot, what is, what does
+   ✅ "Analyze project 98", "Complete details for project 45", "What is project 12 about?"
+   ✅ "Run project 23 and take screenshot", "Test project 67", "What does project 89 do?"
 
 **"project_manager"** - Managing existing projects, viewing project history, project statistics
    🎯 Keywords: list, show, view, my projects, project history, project details, project stats
@@ -247,7 +262,7 @@ When in doubt between friend and a command: CHOOSE THE COMMAND.`
     const result = data.choices[0]?.message?.content?.trim().toLowerCase() || 'qa'
     
     // Validate the response
-    const validCategories: IntentCategory[] = ['help', 'friend', 'qa', 'app_code', 'app_interaction', 'image_gen', 'video_gen', 'translate', 'project_manager']
+    const validCategories: IntentCategory[] = ['help', 'friend', 'qa', 'app_code', 'app_interaction', 'image_gen', 'video_gen', 'translate', 'project_manager', 'app_analyzer']
     const category = validCategories.includes(result as IntentCategory) 
       ? result as IntentCategory 
       : 'qa'
@@ -310,10 +325,11 @@ async function groqClassify(text: string): Promise<IntentResult> {
 
 ⚠️ CRITICAL PRIORITY ORDER:
 1. COMMANDS (image_gen, video_gen, app_code, translate) - If user wants to CREATE/GENERATE/BUILD/MAKE something, this ALWAYS takes priority!
-2. Project management (project_manager) - Managing existing projects
-3. Help requests
-4. Factual questions (qa)
-5. Casual conversation (friend) - ONLY if purely social with NO action requested
+2. App analysis (app_analyzer) - Analyzing existing apps to complete details
+3. Project management (project_manager) - Managing existing projects
+4. Help requests
+5. Factual questions (qa)
+6. Casual conversation (friend) - ONLY if purely social with NO action requested
 
 📋 CATEGORIES:
 
@@ -355,6 +371,11 @@ async function groqClassify(text: string): Promise<IntentResult> {
 **"friend"** - PURELY casual conversation, greetings, small talk, personal chat (NO commands or questions)
    ✅ "Hello!", "How are you?", "What's up?", "Good morning", "Thanks!", "You're cool", "I'm tired"
    ❌ NOT if they want something created/generated/built/translated
+
+**"app_analyzer"** - Analyzing existing apps to complete project details, running apps, taking screenshots
+   🎯 Keywords: analyze, complete, details, run, test, screenshot, what is, what does
+   ✅ "Analyze project 98", "Complete details for project 45", "What is project 12 about?"
+   ✅ "Run project 23 and take screenshot", "Test project 67", "What does project 89 do?"
 
 **"project_manager"** - Managing existing projects, viewing project history, project statistics
    🎯 Keywords: list, show, view, my projects, project history, project details, project stats
@@ -410,7 +431,7 @@ When in doubt between friend and a command: CHOOSE THE COMMAND.`
       const result = data.choices[0]?.message?.content?.trim().toLowerCase() || 'qa'
       
       // Validate the response
-      const validCategories: IntentCategory[] = ['help', 'friend', 'qa', 'app_code', 'app_interaction', 'image_gen', 'video_gen', 'translate', 'project_manager']
+      const validCategories: IntentCategory[] = ['help', 'friend', 'qa', 'app_code', 'app_interaction', 'image_gen', 'video_gen', 'translate', 'project_manager', 'app_analyzer']
       const category = validCategories.includes(result as IntentCategory) 
         ? result as IntentCategory 
         : 'qa'
@@ -492,7 +513,8 @@ export function getCategoryName(category: IntentCategory): string {
     'image_gen': '🎨 Image Generator',
     'video_gen': '🎬 Video Generator',
     'translate': '🌐 Translator',
-    'project_manager': '📁 Project Manager'
+    'project_manager': '📁 Project Manager',
+    'app_analyzer': '🔍 App Analyzer'
   }
   return names[category]
 }
@@ -510,7 +532,8 @@ export function getCategoryEmoji(category: IntentCategory): string {
     'image_gen': '🎨',
     'video_gen': '🎬',
     'translate': '🌐',
-    'project_manager': '📁'
+    'project_manager': '📁',
+    'app_analyzer': '🔍'
   }
   return emojis[category]
 }

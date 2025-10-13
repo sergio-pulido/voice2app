@@ -89,6 +89,27 @@ export async function getProjectById(id: number): Promise<Project | null> {
   return db.projects.find(p => p.id === id) || null
 }
 
+// Update project details
+export async function updateProject(id: number, updates: Partial<Omit<Project, 'id' | 'createdAt'>>): Promise<Project | null> {
+  const db = await loadProjects()
+  const projectIndex = db.projects.findIndex(p => p.id === id)
+  
+  if (projectIndex === -1) {
+    logger.warn(`Project with ID ${id} not found for update`)
+    return null
+  }
+  
+  // Update the project
+  db.projects[projectIndex] = {
+    ...db.projects[projectIndex],
+    ...updates
+  }
+  
+  await saveProjects(db)
+  logger.info(`Updated project: ${db.projects[projectIndex].title} (ID: ${id})`)
+  return db.projects[projectIndex]
+}
+
 // Get project by job ID
 export async function getProjectByJobId(jobId: string): Promise<Project | null> {
   const db = await loadProjects()
