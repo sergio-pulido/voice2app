@@ -17,6 +17,15 @@ interface UserSession {
 // Simple in-memory store (in production, use Redis or database)
 const sessions = new Map<string, UserSession>()
 
+// Separate in-memory store for project list pagination state
+interface ProjectListState {
+  page: number
+  pageSize: number
+  lastUpdated: number
+}
+
+const projectListSessions = new Map<string, ProjectListState>()
+
 // Session expiry time (1 hour)
 const SESSION_EXPIRY = 60 * 60 * 1000
 
@@ -68,6 +77,30 @@ export function updateSessionTimestamp(userId: string): void {
   }
 }
 
+// Project list pagination helpers
+export function setUserProjectListState(userId: string, page: number, pageSize: number): void {
+  projectListSessions.set(userId, {
+    page,
+    pageSize,
+    lastUpdated: Date.now()
+  })
+}
+
+export function getUserProjectListState(userId: string): ProjectListState | null {
+  const state = projectListSessions.get(userId)
+  if (!state) return null
+  // Expire after 1 hour to match session expiry
+  if (Date.now() - state.lastUpdated > SESSION_EXPIRY) {
+    projectListSessions.delete(userId)
+    return null
+  }
+  return state
+}
+
+export function clearUserProjectListState(userId: string): void {
+  projectListSessions.delete(userId)
+}
+
 // Cleanup expired sessions periodically
 setInterval(() => {
   const now = Date.now()
@@ -78,3 +111,14 @@ setInterval(() => {
     }
   }
 }, 5 * 60 * 1000) // Clean up every 5 minutes
+
+// Cleanup expired project list states periodically
+setInterval(() => {
+  const now = Date.now()
+  for (const [userId, state] of projectListSessions.entries()) {
+    if (now - state.lastUpdated > SESSION_EXPIRY) {
+      projectListSessions.delete(userId)
+      logger.debug(`Cleaned up expired project list state for user ${userId}`)
+    }
+  }
+}, 5 * 60 * 1000)

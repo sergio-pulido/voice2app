@@ -1,0 +1,339 @@
+import { AdapterInput, AdapterOutput } from '../types'
+import { logger } from '../../shared/logger'
+import { 
+  getUserProjects, 
+  getProjectById, 
+  searchProjects, 
+  getProjectStats,
+  Project 
+} from '../../shared/project-db'
+import { config } from '../../shared/config'
+import { getUserProjectListState, setUserProjectListState } from '../services/session-store'
+
+interface ProjectManagerRequest {
+  action: 'list' | 'details' | 'search' | 'stats' | 'more'
+  projectId?: number
+  searchQuery?: string
+  page?: number
+}
+
+export class ProjectManagerAdapter {
+  async run(input: AdapterInput): Promise<AdapterOutput> {
+    try {
+      logger.info(`📁 Project Manager: ${input.text}`)
+      
+      const request = await this.parseRequest(input.text, input.userId)
+      
+      switch (request.action) {
+        case 'list':
+          return await this.listProjects(input.userId)
+        
+        case 'details':
+          return await this.getProjectDetails(input.userId, request.projectId!)
+        
+        case 'search':
+          return await this.searchProjects(input.userId, request.searchQuery!)
+        
+        case 'stats':
+          return await this.getProjectStats(input.userId)
+        
+        case 'more':
+          return await this.listMoreProjects(input.userId, request.page || 1)
+        
+        default:
+          return {
+            summaryText: "❌ I couldn't understand what you want to do with your projects. Try:\n\n• \"List my projects\" - See first 100 projects\n• \"Show more projects\" - See next 100 projects\n• \"Page 3\" - Jump to a page\n• \"Show project details for ID 1\" - Get full details\n• \"Search for calculator\" - Find projects\n• \"Project statistics\" - Get overview",
+            metadata: {
+              category: 'project_manager',
+              status: 'error'
+            }
+          }
+      }
+    } catch (error) {
+      logger.error('Project Manager error:', error)
+      return {
+        summaryText: "❌ Sorry, I encountered an error while managing your projects. Please try again.",
+        metadata: {
+          category: 'project_manager',
+          status: 'error'
+        }
+      }
+    }
+  }
+
+  private async parseRequest(text: string, userId: number): Promise<ProjectManagerRequest> {
+    const lowerText = text.toLowerCase()
+    
+    // Check for specific project ID
+    const idMatch = lowerText.match(/(?:project|app|id)\s*(\d+)/)
+    if (idMatch) {
+      return {
+        action: 'details',
+        projectId: parseInt(idMatch[1])
+      }
+    }
+    
+    // Check for "more" or pagination requests
+    if (lowerText.includes('more') || lowerText.includes('show more') || lowerText.includes('next page')) {
+      const pageMatch = lowerText.match(/page\s*(\d+)/)
+      return {
+        action: 'more',
+        page: pageMatch ? parseInt(pageMatch[1]) : 1
+      }
+    }
+    
+    // Check for search queries
+    if (lowerText.includes('search') || lowerText.includes('find') || lowerText.includes('look for')) {
+      const searchQuery = text.replace(/.*?(?:search|find|look for)\s+(.+)/i, '$1').trim()
+      return {
+        action: 'search',
+        searchQuery
+      }
+    }
+    
+    // Check for statistics
+    if (lowerText.includes('stat') || lowerText.includes('summary') || lowerText.includes('overview')) {
+      return { action: 'stats' }
+    }
+    
+    // Default to list
+    return { action: 'list' }
+  }
+
+  private async listProjects(userId: number): Promise<AdapterOutput> {
+    const projects = await getUserProjects(userId)
+    
+    if (projects.length === 0) {
+      return {
+        summaryText: "📁 **Your Projects**\n\nYou haven't created any projects yet! Generate your first app to get started. 🚀",
+        metadata: {
+          category: 'project_manager',
+          status: 'success'
+        }
+      }
+    }
+    
+    // Sort by creation date (newest first)
+    projects.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    
+    // Initialize pagination to first page, pageSize 100
+    const pageSize = 100
+    const page = 1
+    setUserProjectListState(String(userId), page, pageSize)
+    const displayProjects = projects.slice(0, pageSize)
+    
+    let message = `📁 **Your Projects** (${projects.length} total)\n\n`
+    
+    displayProjects.forEach((project, index) => {
+      const statusEmoji = project.status === 'success' ? '✅' : 
+                         project.status === 'partial' ? '⚠️' : '❌'
+      const date = new Date(project.createdAt).toLocaleDateString()
+      
+      message += `${statusEmoji} **ID ${project.id}**: ${project.title}\n`
+      message += `   📅 ${date} | 📁 ${project.folderName}\n\n`
+    })
+    
+    // Add note if there are more projects
+    if (projects.length > pageSize) {
+      message += `\n… and ${projects.length - pageSize} more projects\n\n`
+    } else {
+      message += `\n`
+    }
+    
+    message += `💡 **Commands:**\n`
+    message += `• "Show project details for ID X" - Get full details\n`
+    message += `• "Search for [keyword]" - Find projects\n`
+    message += `• "Project statistics" - Get overview\n`
+    if (projects.length > pageSize) {
+      message += `• "Show more projects" - See next ${pageSize} projects\n`
+    }
+    
+    return {
+      summaryText: message,
+      metadata: {
+        category: 'project_manager',
+        status: 'success'
+      }
+    }
+  }
+
+  private async listMoreProjects(userId: number, page: number): Promise<AdapterOutput> {
+    const projects = await getUserProjects(userId)
+    
+    if (projects.length === 0) {
+      return {
+        summaryText: "📁 **Your Projects**\n\nYou haven't created any projects yet! Generate your first app to get started. 🚀",
+        metadata: {
+          category: 'project_manager',
+          status: 'success'
+        }
+      }
+    }
+    
+    // Sort by creation date (newest first)
+    projects.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    
+    // Determine page and pageSize from stored state (defaults: 100)
+    const stored = getUserProjectListState(String(userId))
+    const pageSize = stored?.pageSize || 100
+    const currentPage = page || stored?.page || 1
+    const startIndex = (currentPage - 1) * pageSize
+    const endIndex = Math.min(projects.length, startIndex + pageSize)
+    const displayProjects = projects.slice(startIndex, endIndex)
+    
+    if (displayProjects.length === 0) {
+      return {
+        summaryText: `📁 **Page ${page}**\n\nNo more projects to show. You've reached the end of your project list! 🎯`,
+        metadata: {
+          category: 'project_manager',
+          status: 'success'
+        }
+      }
+    }
+    
+    // Advance stored page for subsequent "show more" calls
+    setUserProjectListState(String(userId), currentPage + 1, pageSize)
+
+    let message = `📁 **Your Projects - Page ${currentPage}** (${projects.length} total)\n\n`
+    
+    displayProjects.forEach((project) => {
+      const statusEmoji = project.status === 'success' ? '✅' : 
+                         project.status === 'partial' ? '⚠️' : '❌'
+      const date = new Date(project.createdAt).toLocaleDateString()
+      message += `${statusEmoji} ID ${project.id} • ${project.title} • ${date} • ${project.folderName}\n`
+    })
+    
+    message += `💡 **Commands:**\n`
+    message += `• "Show project details for ID X" - Get full details\n`
+    message += `• "Search for [keyword]" - Find projects\n`
+    if (endIndex < projects.length) {
+      message += `• "Show more projects" or "Page ${currentPage + 1}" - Next page\n`
+    }
+    message += `• "List my projects" - Back to first page\n`
+    
+    return {
+      summaryText: message,
+      metadata: {
+        category: 'project_manager',
+        status: 'success'
+      }
+    }
+  }
+
+  private async getProjectDetails(userId: number, projectId: number): Promise<AdapterOutput> {
+    const project = await getProjectById(projectId)
+    
+    if (!project || project.userId !== userId) {
+      return {
+        summaryText: `❌ Project with ID ${projectId} not found or you don't have access to it.`,
+        metadata: {
+          category: 'project_manager',
+          status: 'error'
+        }
+      }
+    }
+    
+    const statusEmoji = project.status === 'success' ? '✅' : 
+                       project.status === 'partial' ? '⚠️' : '❌'
+    const date = new Date(project.createdAt).toLocaleString()
+    
+    let message = `📁 **Project Details**\n\n`
+    message += `${statusEmoji} **${project.title}**\n\n`
+    message += `🆔 **ID**: ${project.id}\n`
+    message += `📁 **Folder**: ${project.folderName}\n`
+    message += `📅 **Created**: ${date}\n`
+    message += `📊 **Status**: ${project.status}\n\n`
+    message += `📝 **Description**: ${project.description}\n\n`
+    message += `📋 **Summary**: ${project.summary}\n\n`
+    
+    if (project.publicUrl) {
+      message += `🌐 **Live URL**: ${project.publicUrl}\n\n`
+    }
+    
+    message += `💡 **Commands:**\n`
+    message += `• "List my projects" - See all projects\n`
+    message += `• "Search for [keyword]" - Find projects\n`
+    
+    const result: AdapterOutput = {
+      summaryText: message,
+      metadata: {
+        category: 'project_manager',
+        status: 'success'
+      }
+    }
+    
+    // Add screenshot if available
+    if (project.screenshotPath) {
+      result.attachments = [project.screenshotPath]
+    }
+    
+    return result
+  }
+
+  private async searchProjects(userId: number, query: string): Promise<AdapterOutput> {
+    const projects = await searchProjects(userId, query)
+    
+    if (projects.length === 0) {
+      return {
+        summaryText: `🔍 **Search Results for "${query}"**\n\nNo projects found matching your search. Try different keywords or create a new project! 🚀`,
+        metadata: {
+          category: 'project_manager',
+          status: 'success'
+        }
+      }
+    }
+    
+    let message = `🔍 **Search Results for "${query}"** (${projects.length} found)\n\n`
+    
+    projects.forEach((project, index) => {
+      const statusEmoji = project.status === 'success' ? '✅' : 
+                         project.status === 'partial' ? '⚠️' : '❌'
+      const date = new Date(project.createdAt).toLocaleDateString()
+      
+      message += `${statusEmoji} **ID ${project.id}**: ${project.title}\n`
+      message += `   📅 ${date} | 📁 ${project.folderName}\n\n`
+    })
+    
+    message += `💡 **Commands:**\n`
+    message += `• "Show project details for ID X" - Get full details\n`
+    message += `• "List my projects" - See all projects\n`
+    
+    return {
+      summaryText: message,
+      metadata: {
+        category: 'project_manager',
+        status: 'success'
+      }
+    }
+  }
+
+  private async getProjectStats(userId: number): Promise<AdapterOutput> {
+    const stats = await getProjectStats(userId)
+    
+    let message = `📊 **Project Statistics**\n\n`
+    message += `📁 **Total Projects**: ${stats.total}\n`
+    message += `✅ **Successful**: ${stats.successful}\n`
+    message += `⚠️ **Partial**: ${stats.partial}\n`
+    message += `❌ **Failed**: ${stats.failed}\n\n`
+    
+    if (stats.total === 0) {
+      message += `🎯 **Get Started**: Generate your first app to begin building your project portfolio! 🚀`
+    } else {
+      const successRate = Math.round((stats.successful / stats.total) * 100)
+      message += `🎯 **Success Rate**: ${successRate}%\n\n`
+      message += `💡 **Commands:**\n`
+      message += `• "List my projects" - See all projects\n`
+      message += `• "Search for [keyword]" - Find projects\n`
+    }
+    
+    return {
+      summaryText: message,
+      metadata: {
+        category: 'project_manager',
+        status: 'success'
+      }
+    }
+  }
+}
+
+export const projectManagerAdapter = new ProjectManagerAdapter()

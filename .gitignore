@@ -147,5 +147,7 @@ vite.config.ts.timestamp-*
 # Voice2App specific
 sandbox/
 artifacts/
+data/
 !sandbox/.gitkeep
 !artifacts/.gitkeep
+!data/.gitkeep

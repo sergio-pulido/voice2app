@@ -9,9 +9,44 @@ import { generateApp } from '../../codegen'
 import { runApp } from '../../runner'
 import { analyzeResults } from '../../analyzer'
 import { setUserAppSession } from '../services/session-store'
+import { addProject } from '../../shared/project-db'
 import type { Adapter, AdapterInput, AdapterOutput } from '../types'
 
 export class AppCodeAdapter implements Adapter {
+  private extractTitle(context: string): string {
+    // Extract a clean title from the context
+    const words = context.split(' ')
+    if (words.length <= 5) {
+      return context
+    }
+    
+    // Look for common patterns
+    const patterns = [
+      /generate\s+(?:a\s+)?(.+?)(?:\s+with|\s+that|\s+for|$)/i,
+      /create\s+(?:a\s+)?(.+?)(?:\s+with|\s+that|\s+for|$)/i,
+      /build\s+(?:a\s+)?(.+?)(?:\s+with|\s+that|\s+for|$)/i,
+      /make\s+(?:a\s+)?(.+?)(?:\s+with|\s+that|\s+for|$)/i
+    ]
+    
+    for (const pattern of patterns) {
+      const match = context.match(pattern)
+      if (match && match[1]) {
+        return match[1].trim()
+      }
+    }
+    
+    // Fallback: first 5 words
+    return words.slice(0, 5).join(' ')
+  }
+  
+  private extractDescription(context: string): string {
+    // Clean up the context for a better description
+    return context
+      .replace(/^(generate|create|build|make)\s+(?:a\s+)?/i, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+  }
+
   async run(input: AdapterInput): Promise<AdapterOutput> {
     logger.info('💻 Running App Code adapter...')
     
@@ -93,6 +128,28 @@ export class AppCodeAdapter implements Adapter {
           task.jobId,
           codegenResult.sandboxPath
         )
+      }
+      
+      // Save project to database
+      try {
+        const folderName = codegenResult.sandboxPath.split('/').pop() || task.jobId
+        const title = this.extractTitle(task.context)
+        const description = this.extractDescription(task.context)
+        
+        await addProject({
+          jobId: task.jobId,
+          folderName,
+          userId: input.userId,
+          title,
+          description,
+          summary: analysisResult.summary,
+          screenshotPath: runnerResult.screenshot,
+          publicUrl: runnerResult.publicUrl,
+          status: analysisResult.status
+        })
+      } catch (error) {
+        logger.error('Failed to save project to database:', error)
+        // Don't fail the entire request if project saving fails
       }
       
       const processingTime = Date.now() - startTime

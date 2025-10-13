@@ -4,7 +4,7 @@
 
 import { logger } from '../shared'
 
-export type IntentCategory = 'qa' | 'app_code' | 'app_interaction' | 'image_gen' | 'video_gen' | 'translate' | 'help' | 'friend'
+export type IntentCategory = 'qa' | 'app_code' | 'app_interaction' | 'image_gen' | 'video_gen' | 'translate' | 'help' | 'friend' | 'project_manager'
 
 export interface IntentResult {
   category: IntentCategory
@@ -66,7 +66,16 @@ async function llmClassify(text: string): Promise<IntentResult> {
     }
   }
   
-  // PRIORITY 2: Translation
+  // PRIORITY 2: Project management
+  if (/\b(list|show|view|my projects|project history|project details|project stats|search for|find my|my apps)\b/i.test(lowerText)) {
+    return {
+      category: 'project_manager',
+      confidence: 0.8,
+      reasoning: 'Project management request detected (fallback)'
+    }
+  }
+  
+  // PRIORITY 3: Translation
   if (/\b(translate|traduce|tradueix|how do you say|cómo se dice)\b/i.test(lowerText)) {
     return {
       category: 'translate',
@@ -75,7 +84,7 @@ async function llmClassify(text: string): Promise<IntentResult> {
     }
   }
   
-  // PRIORITY 3: Greetings/casual (only if NO command detected)
+  // PRIORITY 4: Greetings/casual (only if NO command detected)
   if (/\b(hello|hi|hey|hola|good morning|buenos días|how are you|cómo estás)\b/i.test(lowerText)) {
     return {
       category: 'friend',
@@ -148,9 +157,10 @@ async function openaiClassify(text: string): Promise<IntentResult> {
 
 ⚠️ CRITICAL PRIORITY ORDER:
 1. COMMANDS (image_gen, video_gen, app_code, translate) - If user wants to CREATE/GENERATE/BUILD/MAKE something, this ALWAYS takes priority!
-2. Help requests
-3. Factual questions (qa)
-4. Casual conversation (friend) - ONLY if purely social with NO action requested
+2. Project management (project_manager) - Managing existing projects
+3. Help requests
+4. Factual questions (qa)
+5. Casual conversation (friend) - ONLY if purely social with NO action requested
 
 📋 CATEGORIES:
 
@@ -193,6 +203,12 @@ async function openaiClassify(text: string): Promise<IntentResult> {
    ✅ "Hello!", "How are you?", "What's up?", "Good morning", "Thanks!", "You're cool", "I'm tired"
    ❌ NOT if they want something created/generated/built/translated
 
+**"project_manager"** - Managing existing projects, viewing project history, project statistics
+   🎯 Keywords: list, show, view, my projects, project history, project details, project stats
+   ✅ "List my projects", "Show my apps", "View project details for ID 1", "Project statistics"
+   ✅ "Search for calculator", "Find my snake game", "Show project 2", "My project history"
+   ❌ NOT for creating new projects (that's app_code)
+
 🚨 DISAMBIGUATION RULES:
 - "Generate/Create/Make/Build + [something]" → ALWAYS a command (image_gen/video_gen/app_code), NEVER friend
 - "Generate/Create/Make/Build + game/snake/calculator/app" → ALWAYS app_code
@@ -231,7 +247,7 @@ When in doubt between friend and a command: CHOOSE THE COMMAND.`
     const result = data.choices[0]?.message?.content?.trim().toLowerCase() || 'qa'
     
     // Validate the response
-    const validCategories: IntentCategory[] = ['help', 'friend', 'qa', 'app_code', 'app_interaction', 'image_gen', 'video_gen', 'translate']
+    const validCategories: IntentCategory[] = ['help', 'friend', 'qa', 'app_code', 'app_interaction', 'image_gen', 'video_gen', 'translate', 'project_manager']
     const category = validCategories.includes(result as IntentCategory) 
       ? result as IntentCategory 
       : 'qa'
@@ -294,9 +310,10 @@ async function groqClassify(text: string): Promise<IntentResult> {
 
 ⚠️ CRITICAL PRIORITY ORDER:
 1. COMMANDS (image_gen, video_gen, app_code, translate) - If user wants to CREATE/GENERATE/BUILD/MAKE something, this ALWAYS takes priority!
-2. Help requests
-3. Factual questions (qa)
-4. Casual conversation (friend) - ONLY if purely social with NO action requested
+2. Project management (project_manager) - Managing existing projects
+3. Help requests
+4. Factual questions (qa)
+5. Casual conversation (friend) - ONLY if purely social with NO action requested
 
 📋 CATEGORIES:
 
@@ -338,6 +355,12 @@ async function groqClassify(text: string): Promise<IntentResult> {
 **"friend"** - PURELY casual conversation, greetings, small talk, personal chat (NO commands or questions)
    ✅ "Hello!", "How are you?", "What's up?", "Good morning", "Thanks!", "You're cool", "I'm tired"
    ❌ NOT if they want something created/generated/built/translated
+
+**"project_manager"** - Managing existing projects, viewing project history, project statistics
+   🎯 Keywords: list, show, view, my projects, project history, project details, project stats
+   ✅ "List my projects", "Show my apps", "View project details for ID 1", "Project statistics"
+   ✅ "Search for calculator", "Find my snake game", "Show project 2", "My project history"
+   ❌ NOT for creating new projects (that's app_code)
 
 🚨 DISAMBIGUATION RULES:
 - "Generate/Create/Make/Build + [something]" → ALWAYS a command (image_gen/video_gen/app_code), NEVER friend
@@ -387,7 +410,7 @@ When in doubt between friend and a command: CHOOSE THE COMMAND.`
       const result = data.choices[0]?.message?.content?.trim().toLowerCase() || 'qa'
       
       // Validate the response
-      const validCategories: IntentCategory[] = ['help', 'friend', 'qa', 'app_code', 'app_interaction', 'image_gen', 'video_gen', 'translate']
+      const validCategories: IntentCategory[] = ['help', 'friend', 'qa', 'app_code', 'app_interaction', 'image_gen', 'video_gen', 'translate', 'project_manager']
       const category = validCategories.includes(result as IntentCategory) 
         ? result as IntentCategory 
         : 'qa'
@@ -468,7 +491,8 @@ export function getCategoryName(category: IntentCategory): string {
     'app_interaction': '🎮 App Tester',
     'image_gen': '🎨 Image Generator',
     'video_gen': '🎬 Video Generator',
-    'translate': '🌐 Translator'
+    'translate': '🌐 Translator',
+    'project_manager': '📁 Project Manager'
   }
   return names[category]
 }
@@ -485,7 +509,8 @@ export function getCategoryEmoji(category: IntentCategory): string {
     'app_interaction': '🎮',
     'image_gen': '🎨',
     'video_gen': '🎬',
-    'translate': '🌐'
+    'translate': '🌐',
+    'project_manager': '📁'
   }
   return emojis[category]
 }
