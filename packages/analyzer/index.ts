@@ -4,7 +4,7 @@
 
 import { config, logger, type Task, type RunnerResult, type AnalysisResult } from '../shared'
 import { createLLMProvider } from '../codegen/providers'
-import { readFile } from 'fs/promises'
+import { readFile, readdir } from 'fs/promises'
 import { join } from 'path'
 
 const ANALYSIS_SYSTEM_PROMPT = `You are an expert code reviewer and UX analyst.
@@ -83,30 +83,38 @@ async function analyzeGeneratedCode(
   }
   
   try {
-    // Read the generated App.tsx file to analyze implementation
-    const appPath = join(process.cwd(), runnerResult.sandboxPath || `sandbox/${task.jobId}`, 'src', 'App.tsx')
-    let appCode = ''
-    
-    try {
-      appCode = await readFile(appPath, 'utf-8')
-    } catch (error) {
-      logger.warn(`Could not read App.tsx for analysis: ${error.message}`)
-      // If we can't read the code, assume basic implementation
-      checksCompleted.push(...task.checks)
-      return { checksCompleted, checksFailed }
+    // Read multiple source files for a more reliable analysis
+    const srcDir = join(process.cwd(), runnerResult.sandboxPath || `sandbox/${task.jobId}`, 'src')
+    async function readSrc(dir: string): Promise<string[]> {
+      const entries = await readdir(dir, { withFileTypes: true })
+      const parts: string[] = []
+      for (const e of entries) {
+        const p = join(dir, e.name)
+        if (e.isDirectory()) {
+          parts.push(...await readSrc(p))
+        } else if (/\.(tsx|ts|jsx|js|css)$/i.test(e.name)) {
+          try {
+            const txt = await readFile(p, 'utf-8')
+            parts.push(`// FILE: ${p.split('src')[1] || e.name}\n${txt}`)
+          } catch {}
+        }
+      }
+      return parts
     }
+    const sources = await readSrc(srcDir)
+    const appCode = sources.join('\n\n')
     
     // Use AI to analyze if the generated code implements the required features
     const llm = createLLMProvider()
     
-    const analysisPrompt = `Analyze this React app code to determine which features are implemented:
+    const analysisPrompt = `Analyze this React app codebase to determine which features are implemented:
 
 REQUIRED FEATURES (from task):
 ${task.checks.map(check => `- ${check}`).join('\n')}
 
-GENERATED CODE:
-\`\`\`tsx
-${appCode}
+GENERATED CODE (multiple files):
+\`\`\`
+${appCode.slice(0, 20000)}
 \`\`\`
 
 For each required feature, respond with either "IMPLEMENTED" or "NOT_IMPLEMENTED" followed by a brief explanation.

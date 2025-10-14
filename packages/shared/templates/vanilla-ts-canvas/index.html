@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vanilla TS Canvas Runner</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <div class="card">
+        <div class="hud">Score: <span id="score">0</span></div>
+        <canvas id="game" class="canvas"></canvas>
+        <div class="caption">Jump: ↑ or Space • Tap on mobile</div>
+        <div id="overlay" class="overlay hidden">
+          <div class="overlay-inner">
+            <h2>Game Over</h2>
+            <p>Final score: <span id="final">0</span></p>
+            <button id="restart" class="btn">Restart (Space)</button>
+          </div>
+        </div>
+      </div>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

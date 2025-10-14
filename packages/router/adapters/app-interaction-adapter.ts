@@ -102,7 +102,7 @@ export class AppInteractionAdapter implements Adapter {
       
       if (!videoPath) {
         return {
-          summaryText: `❌ Could not test the app with your request: "${cleanRequest}"\n\n🔍 Possible issues:\n• The app might not be running\n• The request wasn't understood\n• The app interface changed\n\n💡 Try:\n• Generating a new app first\n• Using simpler requests like "add 2+3"`,
+          summaryText: `❌ Could not test the app with your request: "${cleanRequest}"\n\n🔍 Possible issues:\n• The app might not be running\n• The request wasn't understood\n• The app interface changed`,
           metadata: {
             category: 'app_interaction',
             processingTime: Date.now() - startTime,

@@ -49,10 +49,12 @@ export async function processInput(
     return {
       task: {
         jobId,
-        project: 'mvp',
-        intent: 'error',
+        intent: 'create',
+        project: 'unknown',
         context: 'Failed to process input',
         checks: [],
+        template: { id: 'none', confidence: 0, rationale: '', entryPoints: [], healthcheckPath: '/healthz' },
+        runtime: { port: 5173, mustKeepPort: true, mustKeepScripts: true, deterministic: true },
         artifact: { screenshot: false, logs: true },
         chatId,
         messageId,

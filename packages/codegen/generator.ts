@@ -5,6 +5,7 @@
 import { config, logger, type Task, type GeneratedFile } from '../shared'
 import { createLLMProvider } from './providers'
 import { 
+  FRONTEND_DEV_SYSTEM_PROMPT,
   CODEGEN_SYSTEM_PROMPT,
   UI_UX_SYSTEM_PROMPT,
   GAME_DEVELOPMENT_PROMPT,
@@ -121,109 +122,62 @@ function parseEnvelopeFiles(input: string): GeneratedFile[] {
   return files
 }
 
-function buildSystemPrompt(task: Task): string {
-  const shouldIncludeLingo = !task.context.toLowerCase().includes('no localization') && 
-                            !task.context.toLowerCase().includes('authentication')
-  
-  const isTetrisRequest = task.context.toLowerCase().includes('tetris')
-  const isSnakeRequest = task.context.toLowerCase().includes('snake')
-  const isGameRequest = isTetrisRequest || isSnakeRequest || 
-                       task.context.toLowerCase().includes('game') ||
-                       task.context.toLowerCase().includes('pong')
-  
-  let systemPrompt = CODEGEN_SYSTEM_PROMPT + '\n\n' + UI_UX_SYSTEM_PROMPT
-  
-  if (isGameRequest) {
-    systemPrompt += '\n\n' + GAME_DEVELOPMENT_PROMPT
-  }
-  
-  // Add specific templates based on request type
-  if (isSnakeRequest) {
-    systemPrompt += '\n\n' + SNAKE_GAME_TEMPLATE
-  }
-  
-  if (isTetrisRequest) {
-    systemPrompt += '\n\n' + TETRIS_GAME_TEMPLATE
-  }
-  
-  if (task.context.toLowerCase().includes('pong')) {
-    systemPrompt += '\n\n' + PONG_GAME_TEMPLATE
-  }
-  
-  if (task.context.toLowerCase().includes('calculator')) {
-    systemPrompt += '\n\n' + CALCULATOR_TEMPLATE
-  }
-  
-  if (task.context.toLowerCase().includes('todo')) {
-    systemPrompt += '\n\n' + TODO_LIST_TEMPLATE
-  }
-  
-  if (task.context.toLowerCase().includes('weather')) {
-    systemPrompt += '\n\n' + WEATHER_APP_TEMPLATE
-  }
-  
-  // Add configuration templates
-  systemPrompt += '\n\n' + PACKAGE_JSON_TEMPLATE.replace('{{LINGO_DEPENDENCY}}', 
-    shouldIncludeLingo ? ',\n    "lingo.dev": "^0.112.0"' : '')
-  
-  if (shouldIncludeLingo) {
-    systemPrompt += '\n\n' + VITE_CONFIG_WITH_LINGO
-  } else {
-    systemPrompt += '\n\n' + VITE_CONFIG_WITHOUT_LINGO
-  }
-  
-  systemPrompt += '\n\n' + INDEX_HTML_TEMPLATE
-  systemPrompt += '\n\n' + MAIN_TSX_TEMPLATE
-  
-  if (task.context.toLowerCase().includes('authentication')) {
-    systemPrompt += '\n\n' + AUTH_TEMPLATE
-  } else {
-    systemPrompt += '\n\n' + APP_TSX_TEMPLATE
-  }
-  
-  systemPrompt += '\n\n' + POSTCSS_CONFIG_TEMPLATE
-  systemPrompt += '\n\n' + TAILWIND_CONFIG_TEMPLATE
-  systemPrompt += '\n\n' + TSCONFIG_TEMPLATE
-  systemPrompt += '\n\n' + INDEX_CSS_TEMPLATE
-  
-  // Add template hints if available
-  const templateHints = getTemplateHints(task)
-  if (templateHints) {
-    systemPrompt += '\n\n' + templateHints
-  }
-  
-  systemPrompt += `
-CRITICAL OUTPUT FORMAT:
-You must return ONLY a valid JSON array. Nothing else. No explanation, no markdown, no code blocks.
+export function buildSystemPrompt({ templateId, healthcheckPath, entryPoints }: {
+  templateId: 'vite-react-canvas'|'nextjs-basic-ui'|'vanilla-ts-canvas'|'none',
+  healthcheckPath?: string,
+  entryPoints?: string[]
+}) {
+  const COMMON = `
+You are a code generator. You must return a JSON array of files to write:
+[{ "path": "...", "content": "..." }, ...]
+All files MUST be relative to project root. Do not include explanations outside JSON.
+NEVER remove package scripts or change port 5173. Preserve /healthz readiness.
 
-The response must be a JSON array where each item has:
-{
-  "path": "string",     // File path like "package.json"
-  "content": "string"   // File content as properly escaped JSON string
-}
+Allowed file targets:
+- Only modify listed entry points and new files under /src or /app if needed.
+- Avoid touching package.json scripts and configs unless explicitly requested.
+`;
 
-🚨 CRITICAL RULES:
-1. Use ONLY double quotes (") - NEVER backticks (\`) or single quotes (')
-2. The "content" field must be a properly escaped JSON string
-3. For file content that contains {"name": "app"}, write: "{\\"name\\": \\"app\\"}"
-4. Escape ALL special characters: newlines → \\\\n, quotes → \\\\", backslashes → \\\\\\\\
-5. Return raw JSON array only - no \`\`\`json blocks, no explanations
+  const PER_TEMPLATE: Record<string, string> = {
+    'vite-react-canvas': `
+Project scaffold: Vite + React + TS (already present).
+Healthcheck path: ${healthcheckPath ?? '/healthz'}
+Primary entry points you may modify: ${entryPoints?.join(', ') ?? 'src/game/engine.ts, src/App.tsx'}
 
-Example of correct format:
-[
-  {
-    "path": "package.json",
-    "content": "{\\"name\\": \\"my-app\\",\\"version\\": \\"1.0.0\\",\\"scripts\\": {\\"dev\\": \\"vite\\"}}"
-  },
-  {
-    "path": "src/App.tsx",
-    "content": "import React from 'react'\\\\n\\\\nfunction App() {\\\\n  return <h1>Hello</h1>\\\\n}"
-  }
-]
+Hard rules:
+- Implement game logic in canvas without calling React state inside requestAnimationFrame.
+- Keep port fixed at 5173. Do not add external assets; draw with canvas or inline.
+- Provide jump with ↑/Space/tap, obstacles & birds, collisions -> game over -> restart.
+`,
+    'nextjs-basic-ui': `
+Project scaffold: Next.js (App Router + TS) (already present).
+Healthcheck route: ${healthcheckPath ?? '/healthz'}
+Primary entry points you may modify: ${entryPoints?.join(', ') ?? 'app/page.tsx, app/api/*'}
 
-Return ONLY the JSON array now.`
-  
-  return systemPrompt
+Hard rules:
+- Keep dev/start on port 5173 as configured.
+- Add UI components/pages and minimal API routes as needed.
+- Do not add heavy deps; prioritize built-in Next features.
+`,
+    'vanilla-ts-canvas': `
+Project scaffold: Vite + TypeScript (no framework) (already present).
+Healthcheck path: ${healthcheckPath ?? '/healthz'}
+Primary entry points you may modify: ${entryPoints?.join(', ') ?? 'src/engine.ts, src/styles.css'}
+
+Hard rules:
+- Use canvas only. No external assets.
+- Implement game loop, physics, spawn, collisions, scoring, restart.
+- Keep port fixed at 5173.
+`,
+    'none': `
+No scaffold exists. You must generate a runnable project that:
+- Uses Vite + TS OR Next.js depending on the app (choose the minimal that satisfies the request).
+- Fixed port 5173, healthcheck at /healthz.
+- Output the ENTIRE project structure.
+`
+  };
+
+  return COMMON + '\n' + PER_TEMPLATE[templateId];
 }
 
 function buildPrompt(task: Task): string {
@@ -252,23 +206,31 @@ export async function generateCode(task: Task): Promise<GeneratedFile[]> {
     if (templateResult) {
       logger.success('✅ Generated from template!')
       return templateResult
+    } else {
+      logger.warn('❌ No template match found, doing it from scratch')
     }
     
     // Fall back to LLM generation
     logger.job(task.jobId, 'Generating code with LLM...')
     
-    const prompt = buildPrompt(task)
+    // Build system and user prompts
+    const systemPrompt = buildSystemPrompt(task)
+    const userPrompt = buildPrompt(task)
+
+    // Create LLM provider
     const llm = createLLMProvider()
     
+    // Complete
     const response = await llm.complete({
       messages: [
-        { role: 'system', content: buildSystemPrompt(task) },
-        { role: 'user', content: prompt },
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
       ],
       temperature: 0.7,
       maxTokens: 8000,
     })
     
+    // Get response content
     const content = response.content
     
     // Show the whole result

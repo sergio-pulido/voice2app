@@ -8,7 +8,7 @@ import { join } from 'path'
 import { mkdir } from 'fs/promises'
 
 export interface InteractionStep {
-  type: 'type' | 'click' | 'wait' | 'scroll' | 'select'
+  type: 'type' | 'click' | 'wait' | 'scroll' | 'select' | 'keyboard'
   selector?: string
   text?: string
   duration?: number
@@ -182,6 +182,15 @@ async function executeStep(page: any, step: InteractionStep): Promise<void> {
         await page.keyboard.press(`Arrow${step.direction.charAt(0).toUpperCase() + step.direction.slice(1)}`)
       }
       break
+    case 'keyboard':
+      if (step.text) {
+        // Allow comma-separated key chords, e.g., "Control+K, Enter"
+        const combos = step.text.split(',').map(s => s.trim()).filter(Boolean)
+        for (const combo of combos) {
+          await page.keyboard.press(combo)
+        }
+      }
+      break
   }
 }
 
@@ -256,7 +265,13 @@ Make the test realistic and demonstrate the app's main functionality based on th
     })
     
     try {
-      const testPlan = JSON.parse(response.content.trim())
+      // Clean LLM response: remove code fences and extract JSON object
+      let raw = response.content.trim()
+      const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/)
+      if (fenced) raw = fenced[1].trim()
+      const objMatch = raw.match(/\{[\s\S]*\}/)
+      const jsonStr = objMatch ? objMatch[0] : raw
+      const testPlan = JSON.parse(jsonStr)
       
       // Validate the test plan structure
       if (!testPlan.description || !Array.isArray(testPlan.steps)) {

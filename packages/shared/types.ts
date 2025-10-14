@@ -26,19 +26,40 @@ export interface TelegramUpdate {
   callback_query?: any
 }
 
-export interface Task {
-  jobId: string
-  project: string
-  intent: string
-  context: string
-  checks: string[]
-  artifact: {
-    screenshot: boolean
-    logs: boolean
-  }
-  chatId: number
-  messageId: number
-}
+export type TemplateId = 'vite-react-canvas' | 'nextjs-basic-ui' | 'vanilla-ts-canvas' | 'none';
+
+export type Task = {
+  jobId: string;
+  intent: 'create' | 'edit' | 'explain';
+  project: 'canvas' | 'ui' | 'fullstack' | 'unknown';
+  context: string;
+  checks: string[];
+
+  // NEW — template-driven build
+  template: {
+    id: TemplateId;                // chosen template
+    confidence: number;            // 0..1
+    rationale: string;             // brief reason
+    entryPoints: string[];         // files the codegen may modify
+    healthcheckPath: string;       // e.g., "/healthz"
+  };
+
+  // NEW — runner invariants your pipeline relies on
+  runtime: {
+    port: number;                  // fixed: 5173
+    mustKeepPort: boolean;         // true
+    mustKeepScripts: boolean;      // true
+    deterministic: boolean;        // true => no external assets
+  };
+
+  // Output artifacts
+  artifact: { 
+    screenshot: boolean; 
+    logs: boolean; 
+  };
+  chatId?: number;
+  messageId?: number;
+};
 
 export interface CodegenResult {
   success: boolean

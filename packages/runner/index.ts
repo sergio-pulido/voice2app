@@ -46,6 +46,7 @@ export async function runApp(task: Task, sandboxPath: string): Promise<RunnerRes
 
     // Step 3: Basic tester validation before tunnels/screenshots
     const basicTest = await testApp(task, url, sandboxPath)
+    console.log('basicTest', basicTest)
     if (!basicTest.success) {
       return {
         success: false,

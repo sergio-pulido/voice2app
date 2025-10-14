@@ -139,7 +139,7 @@ export async function serveApp(sandboxPath: string, jobId: string): Promise<Serv
       })
 
       // Wait for server to be ready
-      const maxWaitTime = 10000 // 10 seconds max for dev server
+      const maxWaitTime = 20000 // 20 seconds max for dev server
       const startTime = Date.now()
 
       while (!serverReady && (Date.now() - startTime) < maxWaitTime) {
@@ -147,7 +147,7 @@ export async function serveApp(sandboxPath: string, jobId: string): Promise<Serv
 
         // Try to connect to the port
         try {
-          const response = await fetch(url, { signal: AbortSignal.timeout(1000) })
+          const response = await fetch(url, { signal: AbortSignal.timeout(1500), method: 'HEAD' })
           if (response.ok) {
             serverReady = true
             break
@@ -164,7 +164,7 @@ export async function serveApp(sandboxPath: string, jobId: string): Promise<Serv
 
       // Post-start validation: ensure the app serves a valid entry without 500s
       const validateStart = Date.now()
-      const validateTimeoutMs = 15000
+      const validateTimeoutMs = 30000
       let validated = false
       while (!validated && (Date.now() - validateStart) < validateTimeoutMs) {
         try {
@@ -188,7 +188,18 @@ export async function serveApp(sandboxPath: string, jobId: string): Promise<Serv
                 logs.push(`[CHECK] ${scriptSrc} -> fetch error`)
               }
             } else {
-              logs.push('[CHECK] No module script found in index.html')
+              logs.push('[CHECK] No module script found in index.html, trying /src/main.tsx')
+              try {
+                const fallbackRes = await fetch(url + '/src/main.tsx', { signal: AbortSignal.timeout(1500) })
+                if (fallbackRes.ok) {
+                  validated = true
+                  break
+                } else {
+                  logs.push(`[CHECK] /src/main.tsx -> ${fallbackRes.status}`)
+                }
+              } catch (e) {
+                logs.push('[CHECK] /src/main.tsx -> fetch error')
+              }
             }
           }
         } catch (e) {
@@ -198,10 +209,15 @@ export async function serveApp(sandboxPath: string, jobId: string): Promise<Serv
       }
 
       if (!validated) {
-        const errMsg = 'Validation failed: main entry not served (e.g., /src/main.tsx returns non-2xx)'
+        const errMsg = 'Validation failed: main entry not served (e.g., / and module script did not return 2xx)'
         logger.error(errMsg)
         errors.push(errMsg)
-        try { devProcess.kill() } catch {}
+        try { 
+          logger.warn('Killing dev process')
+          devProcess.kill() } 
+        catch {
+          logger.warn('Failed to kill dev process')
+        }
         return {
           success: false,
           logs,

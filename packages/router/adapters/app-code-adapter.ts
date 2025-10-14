@@ -10,10 +10,91 @@ import { runApp } from '../../runner'
 import { analyzeResults } from '../../analyzer'
 import { setUserAppSession } from '../services/session-store'
 import { addProject } from '../../shared/project-db'
+import { readFile, writeFile, mkdir } from 'fs/promises'
+import { join, dirname } from 'path'
 import { createLLMProvider } from '../../codegen/providers'
 import type { Adapter, AdapterInput, AdapterOutput } from '../types'
 
 export class AppCodeAdapter implements Adapter {
+  private parseEnvelopeFiles(input: string): Array<{ path: string; content: string; language?: string }> {
+    const files: Array<{ path: string; content: string; language?: string }> = []
+    const fileStartRegex = /<<<FILE\s+path=\"([^\"]+)\"(?:\s+language=\"([^\"]+)\")?\s*>>>/g
+    let match: RegExpExecArray | null
+    while ((match = fileStartRegex.exec(input)) !== null) {
+      const path = match[1]
+      const language = match[2]
+      const startIdx = match.index + match[0].length
+      const endMarker = '<<<END FILE>>>'
+      const endIdx = input.indexOf(endMarker, startIdx)
+      if (endIdx === -1) break
+      const content = input.slice(startIdx, endIdx)
+      files.push({ path, content, language })
+      fileStartRegex.lastIndex = endIdx + endMarker.length
+    }
+    return files
+  }
+
+  private async applyEnvelopeFiles(sandboxPath: string, files: Array<{ path: string; content: string }>): Promise<void> {
+    for (const f of files) {
+      const filePath = join(sandboxPath, f.path)
+      await mkdir(dirname(filePath), { recursive: true })
+      await writeFile(filePath, f.content, 'utf-8')
+    }
+  }
+
+  private async buildRefinePrompt(task: any, analysisSummary: string, checksFailed: string[], sandboxPath: string, runnerLogs: string[] = [], runnerErrors: string[] = []): Promise<string> {
+    let appTsx = ''
+    let logicTs = ''
+    try {
+      appTsx = await readFile(join(sandboxPath, 'src', 'App.tsx'), 'utf-8')
+    } catch {}
+    try {
+      logicTs = await readFile(join(sandboxPath, 'src', 'useGameLogic.ts'), 'utf-8')
+    } catch {}
+
+    const appPreview = appTsx.slice(0, 2000)
+    const logicPreview = logicTs.slice(0, 2000)
+
+    const recentLogs = runnerLogs.slice(-20).join('\n')
+    const recentErrors = runnerErrors.slice(-10).join('\n')
+
+    return `You are improving an existing Vite React TypeScript game to satisfy missing features.
+Task: ${task.context}
+
+Missing features to implement now (must be functional):
+${checksFailed.map(c => `- ${c}`).join('\n')}
+
+Project structure (excerpt):
+- src/App.tsx (main UI)
+- src/main.tsx
+- index.html
+- tsconfig.json
+
+Important constraints:
+- Return ONLY the changed or new files using this envelope format (no explanations):
+<<<FILE path="path/relative/from/sandbox" language="..." >>>
+<raw file contents>
+<<<END FILE>>>
+- Do not resend unchanged files.
+- Do NOT modify index.html or src/main.tsx unless absolutely necessary. If you must, keep the module entry as: <script type="module" src="/src/main.tsx"></script>
+- Ensure the app builds and runs with Vite.
+- Implement real side-scrolling, jump control (ArrowUp), ground and flying obstacles, and increasing difficulty.
+
+Current App.tsx (first 2000 chars):
+${appPreview}
+
+Current useGameLogic.ts (if present, first 2000 chars):
+${logicPreview}
+
+Recent Vite/build logs (last 20 lines):
+${recentLogs}
+
+Recent errors (if any):
+${recentErrors}
+
+Now return only the envelope blocks for files to add or modify.`
+  }
+
   private extractTitle(context: string): string {
     // Extract a clean title from the context
     const words = context.split(' ')
@@ -57,8 +138,8 @@ export class AppCodeAdapter implements Adapter {
       // Use the existing Voice2App pipeline
       // This is the core functionality we already built
       
-      // Step 1: Planning
-      logger.info('📋 Step 1: Planning...')
+      // STEP 1: Planning
+      logger.info('📋 STEP 1: Planning...')
       const plannerResult = await processInput(
         input.userId,
         0, // messageId not needed for adapter
@@ -72,28 +153,71 @@ export class AppCodeAdapter implements Adapter {
       
       const task = plannerResult.task!
       
-      // Step 2: Code Generation
-      logger.info('💻 Step 2: Generating code...')
+      // STEP 2: Code Generation
+      logger.info('💻 STEP 2: Generating code...')
       const codegenResult = await generateApp(task)
       
       if (!codegenResult.success) {
         throw new Error(`Code generation failed: ${codegenResult.error}`)
       }
       
-      // Step 3: Running
-      logger.info('🏃 Step 3: Running app...')
+      // STEP 3: Run + iterative refine loop
+      logger.info('🏃 STEP 3: Running app...')
       const sandboxPath = codegenResult.sandboxPath || `sandbox/${task.jobId}`
-      const runnerResult = await runApp(task, sandboxPath)
 
-      // Step 4: Analysis
-      logger.info('📊 Step 4: Analyzing results...')
-      const analysisResult = await analyzeResults(task, runnerResult)
+      let runnerResult = await runApp(task, sandboxPath)
+      console.log('runnerResult', runnerResult)
+
+      let appTestSuccess = runnerResult.success
+
+      // STEP 4: Analyze results
+      if (!appTestSuccess) {
+        logger.error(`❌ Failed to run app: ${runnerResult.errors?.join('\n') || 'Unknown error'}`)
+        
+        // Iteratively refine if features are missing
+        const maxIterations = 3
+        let iteration = 0
+        while (iteration < maxIterations && analysisResult.status !== 'success') {
+          iteration++
+          logger.warn(`🔁 Refinement iteration ${iteration}/${maxIterations} - improving missing features...`)
+          const checksFailed = analysisResult.checksFailed?.length ? analysisResult.checksFailed : []
+          if (checksFailed.length === 0) break
+
+          const llm = createLLMProvider()
+          const refinePrompt = await this.buildRefinePrompt(task, analysisResult.summary, checksFailed, sandboxPath, runnerResult.logs || [], runnerResult.errors || [])
+          const completion = await llm.complete({
+            messages: [
+              { role: 'system', content: 'Return ONLY envelope file blocks as specified. No prose.' },
+              { role: 'user', content: refinePrompt }
+            ],
+            temperature: 0.2,
+            maxTokens: 6000,
+          })
+          const envelope = completion.content || ''
+          const files = this.parseEnvelopeFiles(envelope)
+          if (files.length === 0) {
+            logger.warn('No envelope files returned by LLM; stopping refinement loop.')
+            break
+          }
+          await this.applyEnvelopeFiles(sandboxPath, files.map(f => ({ path: f.path, content: f.content })))
+
+          // Re-run
+          runnerResult = await runApp(task, sandboxPath)
+          appTestSuccess = runnerResult.success
+        }
+      }
+
+      let analysisResult = null
+      if (appTestSuccess) {
+        logger.info('📊 STEP 4: Analyzing results...')
+        analysisResult = await analyzeResults(task, runnerResult)
+      }
       
       // Build response message
-      const statusEmoji = analysisResult.status === 'success' ? '✅' : analysisResult.status === 'partial' ? '⚠️' : '❌'
+      const statusEmoji = analysisResult?.status === 'success' ? '✅' : analysisResult?.status === 'partial' ? '⚠️' : '❌'
       
       let message = `${statusEmoji} ${task.context}\n\n`
-      message += `${analysisResult.summary}\n\n`
+      message += analysisResult ? `${analysisResult.summary}\n\n` : ''
       
       // Add public URL right after summary if available (even for failed apps)
       if (runnerResult.publicUrl) {
@@ -102,15 +226,15 @@ export class AppCodeAdapter implements Adapter {
       }
       
       // Add interactive choices for successful apps
-      if (analysisResult.status === 'success' && runnerResult.url) {
+      if (analysisResult?.status === 'success' && runnerResult.url) {
         message += `🎮 What would you like to do next?\n\n`
         // message += `1️⃣ Test the app - Ask me to interact with it (e.g., "add 2+5", "play the game")\n`
         // message += `2️⃣ Close - We're done here\n\n`
         // message += `Just tell me what you want to test! 🚀\n\n`
       } else {
-        if (analysisResult.suggestions.length > 0) {
+        if (analysisResult?.suggestions.length > 0) {
           message += `💡 Suggestions:\n`
-          analysisResult.suggestions.forEach((suggestion, i) => {
+          analysisResult?.suggestions.forEach((suggestion, i) => {
             message += `${i + 1}. ${suggestion}\n`
           })
         }
@@ -121,7 +245,7 @@ export class AppCodeAdapter implements Adapter {
       }
       
       // Store session data for interactive testing
-      if (analysisResult.status === 'success' && runnerResult.url) {
+      if (analysisResult?.status === 'success' && runnerResult.url) {
         // Try to read the main app code for better test generation
         let appCode: string | undefined
         try {
@@ -150,14 +274,14 @@ export class AppCodeAdapter implements Adapter {
         const folderName = codegenResult.sandboxPath.split('/').pop() || task.jobId
         let title = this.extractTitle(task.context)
         let description = this.extractDescription(task.context)
-        let summary = analysisResult.summary
+        let summary = analysisResult?.summary || ''
 
         // Enrich metadata with LLM if needed
         try {
           const llm = createLLMProvider()
           const prompt = [
             { role: 'system', content: 'You generate concise metadata for an app project log. Return strict JSON with keys: title (≤60 chars), description (one short line ≤140 chars), summary (2-4 sentences). Do not include markdown, backticks, or extra text.' },
-            { role: 'user', content: `Task context: ${task.context}\nStatus: ${analysisResult.status}\nAnalysis summary: ${analysisResult.summary || 'N/A'}\nBuild errors: ${(runnerResult.errors || []).join('\n').slice(0, 1000)}` }
+            { role: 'user', content: `Task context: ${task.context}\nStatus: ${analysisResult?.status || 'N/A'}\nAnalysis summary: ${analysisResult?.summary || 'N/A'}\nBuild errors: ${(runnerResult.errors || []).join('\n').slice(0, 1000)}` }
           ]
           const completion = await llm.complete({ messages: prompt, temperature: 0.2, maxTokens: 300 })
           try {
@@ -179,7 +303,7 @@ export class AppCodeAdapter implements Adapter {
           summary,
           screenshotPath: runnerResult.screenshot,
           publicUrl: runnerResult.publicUrl,
-          status: analysisResult.status
+          status: analysisResult?.status || 'failed'
         })
       } catch (error) {
         logger.error('Failed to save project to database:', error)

@@ -30,6 +30,10 @@ app.post('/telegram', async (c) => {
   }
   
   const update = await c.req.json<TelegramUpdate>()
+  console.log(' ')
+  console.log('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@')
+  console.log('@@@@@ 🔔 NEW MESSAGE RECEIVED 🔔 @@@@@')
+  console.log('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@')
   logger.debug('Received Telegram update:', JSON.stringify(update, null, 2))
   
   const chatId = update?.message?.chat?.id
