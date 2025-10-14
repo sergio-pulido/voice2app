@@ -248,7 +248,17 @@ export class AppAnalyzerAdapter implements Adapter {
     const prompt = [
       {
         role: 'system',
-        content: APP_ANALYSIS_PROMPT
+        content: APP_ANALYSIS_PROMPT + `
+
+🚨 CRITICAL: Return ONLY valid JSON in this exact format:
+{
+  "title": "Your title here (max 60 chars)",
+  "description": "Your description here (max 140 chars)",
+  "summary": "Your summary here (2-4 sentences)"
+}
+
+DO NOT use markdown formatting, bullet points, or any other format.
+Return ONLY the raw JSON object, nothing else.`
       },
       {
         role: 'user',
@@ -273,6 +283,22 @@ export class AppAnalyzerAdapter implements Adapter {
         cleanResponse = cleanResponse.replace(/^```\s*/, '').replace(/\s*```$/, '')
       }
       
+      // Check if it's markdown bullet points instead of JSON
+      if (cleanResponse.includes('**Title:**') || cleanResponse.includes('- **Title:**')) {
+        logger.warn('LLM returned markdown format instead of JSON, parsing manually...')
+        
+        // Extract from markdown format
+        const titleMatch = cleanResponse.match(/\*\*Title:\*\*\s*(.+?)(?:\n|$)/i)
+        const descMatch = cleanResponse.match(/\*\*Description:\*\*\s*(.+?)(?:\n|$)/i)
+        const summaryMatch = cleanResponse.match(/\*\*Summary:\*\*\s*(.+?)(?:\n|$)/is)
+        
+        return {
+          title: titleMatch ? titleMatch[1].trim() : project.title,
+          description: descMatch ? descMatch[1].trim() : project.description,
+          summary: summaryMatch ? summaryMatch[1].trim() : project.summary
+        }
+      }
+      
       // Remove any leading/trailing text that's not JSON
       const jsonMatch = cleanResponse.match(/\{[\s\S]*\}/)
       if (jsonMatch) {
@@ -287,16 +313,18 @@ export class AppAnalyzerAdapter implements Adapter {
       }
     } catch (error) {
       logger.error('Failed to parse LLM analysis:', error)
-      logger.debug('LLM response:', response.content)
+      logger.debug('LLM response (first 300 chars):', response.content.substring(0, 300))
       
-      // Fallback: try to extract information from the response text
-      const responseText = response.content.toLowerCase()
+      // Enhanced fallback: try to extract information from the response text
+      const responseText = response.content
       let title = project.title
       let description = project.description
       let summary = project.summary
       
-      // Try to extract title
-      const titleMatch = response.content.match(/title["\s]*:["\s]*([^",\n]+)/i)
+      // Try multiple extraction patterns
+      
+      // Pattern 1: "Title: value" or "**Title:** value"
+      const titleMatch = responseText.match(/\*?\*?title\*?\*?["\s]*:["\s]*([^",\n]+)/i)
       if (titleMatch) title = titleMatch[1].trim()
       
       // Try to extract description

@@ -93,7 +93,7 @@ export async function generateImage(prompt: string): Promise<string> {
 }
 
 /**
- * Generate image with retry logic
+ * Generate image with retry logic (smart retry - skips retries for quota errors)
  */
 export async function generateImageWithRetry(
   prompt: string,
@@ -109,6 +109,12 @@ export async function generateImageWithRetry(
       const errorMsg = error?.message || 'Unknown error'
       logger.warn(`Image generation failed (attempt ${attempt}/${maxRetries}): ${errorMsg}`)
       
+      // Don't retry if it's a quota/credit error - fail fast
+      if (errorMsg.includes('quota') || errorMsg.includes('credits') || errorMsg.includes('exceeded')) {
+        logger.warn('⚠️  Quota/credit error detected - skipping retries')
+        break
+      }
+      
       if (attempt < maxRetries) {
         // Longer delays for model loading
         const delay = attempt === 1 ? 5000 : 10000 // 5s, 10s, 15s
@@ -118,13 +124,13 @@ export async function generateImageWithRetry(
     }
   }
   
-  logger.error(`Failed to generate image after ${maxRetries} attempts`)
+  logger.error(`Failed to generate image after attempts`)
   logger.error(`Last error: ${lastError?.message}`)
   return null
 }
 
 /**
- * Generate image with multiple model fallbacks
+ * Generate image with multiple model fallbacks (smart fallback - detects quota errors)
  */
 export async function generateImageWithModelFallbacks(
   prompt: string,
@@ -141,6 +147,8 @@ export async function generateImageWithModelFallbacks(
   // Remove duplicates while preserving order
   const uniqueModels = [...new Set(fallbackModels)]
   
+  let quotaError = false
+  
   for (const model of uniqueModels) {
     logger.info(`🎨 Trying model: ${model}`)
     
@@ -155,14 +163,27 @@ export async function generateImageWithModelFallbacks(
         return result
       }
     } catch (error: any) {
-      logger.warn(`❌ Model ${model} failed: ${error.message}`)
+      const errorMsg = error?.message || ''
+      logger.warn(`❌ Model ${model} failed: ${errorMsg}`)
+      
+      // If it's a quota error, no point trying other models - they'll all fail
+      if (errorMsg.includes('quota') || errorMsg.includes('credits') || errorMsg.includes('exceeded')) {
+        logger.warn('⚠️  Quota error detected - skipping remaining HuggingFace models')
+        quotaError = true
+        config.imageModel = originalModel
+        break
+      }
     } finally {
       // Restore original model
       config.imageModel = originalModel
     }
   }
   
-  logger.error(`❌ All models failed for prompt: ${prompt}`)
+  if (quotaError) {
+    logger.error(`❌ HuggingFace quota exceeded for prompt: ${prompt}`)
+  } else {
+    logger.error(`❌ All HuggingFace models failed for prompt: ${prompt}`)
+  }
   return null
 }
 

@@ -6,6 +6,8 @@
 import { logger, config } from '../../shared'
 import { generateImageWithRetry, generateImageWithModelFallbacks } from '../services/huggingface-service'
 import { generateImageWithGeminiRetry } from '../services/gemini-image-service'
+import { generateImageWithFalRetry } from '../services/fal-image-service'
+import { generateImageWithOpenAIRetry } from '../services/openai-image-service'
 import { translate } from '../services/free-translation-service'
 import type { Adapter, AdapterInput, AdapterOutput } from '../types'
 
@@ -58,81 +60,104 @@ export class ImageAdapter implements Adapter {
       logger.debug(`Image prompt: "${prompt}"`)
       logger.info(`Using image provider: ${provider}`)
       
-      // Generate image with selected provider and fallbacks
-      let imagePath: string | null
-      let modelName: string
-      let modelId: string
+      // Smart fallback chain: HuggingFace → fal.ai → OpenAI → Gemini
+      let imagePath: string | null = null
+      let modelName: string = ''
+      let modelId: string = ''
       let usedProvider = provider
       let fallbackUsed = false
       
+      // Try primary provider first
       if (provider === 'gemini') {
-        logger.info(`🎨 Generating image with Google Gemini: "${prompt.substring(0, 50)}..."`)
+        logger.info(`🎨 Trying primary: Google Gemini...`)
         imagePath = await generateImageWithGeminiRetry(prompt)
-        modelName = 'Google Gemini (Imagen 3)'
-        modelId = 'imagen-3.0'
-        
-        // Fallback to HuggingFace if Gemini fails
-        if (!imagePath && config.huggingfaceApiKey) {
-          logger.info(`🔄 Gemini failed, trying HuggingFace fallback...`)
-          usedProvider = 'huggingface'
-          fallbackUsed = true
-          imagePath = await generateImageWithModelFallbacks(prompt)
-          
-          // Get model name from config and make it display-friendly
+        if (imagePath) {
+          modelName = 'Google Gemini (Imagen 3)'
+          modelId = 'imagen-3.0'
+        }
+      } else {
+        logger.info(`🎨 Trying primary: HuggingFace...`)
+        imagePath = await generateImageWithModelFallbacks(prompt)
+        if (imagePath) {
           const fullModelId = config.imageModel
           modelId = fullModelId
           
           // Extract friendly name from model ID
           if (fullModelId.includes('playground-v2.5')) {
-            modelName = 'Playground v2.5 (Fallback)'
+            modelName = 'Playground v2.5'
           } else if (fullModelId.includes('flux')) {
-            modelName = 'Flux.1 (Fallback)'
+            modelName = 'Flux.1'
           } else if (fullModelId.includes('sd3') || fullModelId.includes('stable-diffusion-3')) {
-            modelName = 'Stable Diffusion 3 (Fallback)'
+            modelName = 'Stable Diffusion 3'
           } else if (fullModelId.includes('sdxl') || fullModelId.includes('stable-diffusion-xl')) {
-            modelName = 'Stable Diffusion XL (Fallback)'
+            modelName = 'Stable Diffusion XL'
           } else {
-            // Fallback: extract last part of model ID
             const parts = fullModelId.split('/')
-            modelName = parts[parts.length - 1].replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) + ' (Fallback)'
+            modelName = parts[parts.length - 1].replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
           }
         }
-      } else {
-        logger.info(`🎨 Generating image with HuggingFace: "${prompt.substring(0, 50)}..."`)
-        imagePath = await generateImageWithModelFallbacks(prompt)
-        
-        // Get model name from config and make it display-friendly
-        const fullModelId = config.imageModel
-        modelId = fullModelId
-        
-        // Extract friendly name from model ID
-        if (fullModelId.includes('playground-v2.5')) {
-          modelName = 'Playground v2.5'
-        } else if (fullModelId.includes('flux')) {
-          modelName = 'Flux.1'
-        } else if (fullModelId.includes('sd3') || fullModelId.includes('stable-diffusion-3')) {
-          modelName = 'Stable Diffusion 3'
-        } else if (fullModelId.includes('sdxl') || fullModelId.includes('stable-diffusion-xl')) {
-          modelName = 'Stable Diffusion XL'
-        } else {
-          // Fallback: extract last part of model ID
-          const parts = fullModelId.split('/')
-          modelName = parts[parts.length - 1].replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+      }
+      
+      // Fallback chain: fal.ai → OpenAI → Gemini → HuggingFace
+      if (!imagePath && config.falApiKey) {
+        logger.info(`🔄 Primary failed, trying fal.ai...`)
+        usedProvider = 'fal'
+        fallbackUsed = true
+        imagePath = await generateImageWithFalRetry(prompt)
+        if (imagePath) {
+          modelName = 'FLUX.1 Schnell (fal.ai)'
+          modelId = 'flux-schnell-fal'
         }
-        
-        // Fallback to Gemini if HuggingFace fails
-        if (!imagePath && config.geminiApiKey) {
-          logger.info(`🔄 HuggingFace failed, trying Gemini fallback...`)
-          usedProvider = 'gemini'
-          fallbackUsed = true
-          imagePath = await generateImageWithGeminiRetry(prompt)
-          modelName = 'Google Gemini (Imagen 3) (Fallback)'
-          modelId = 'imagen-3.0-fallback'
+      }
+      
+      if (!imagePath && config.openaiApiKey) {
+        logger.info(`🔄 fal.ai failed, trying OpenAI DALL-E...`)
+        usedProvider = 'openai'
+        fallbackUsed = true
+        imagePath = await generateImageWithOpenAIRetry(prompt)
+        if (imagePath) {
+          modelName = 'DALL-E 3 (OpenAI)'
+          modelId = 'dall-e-3'
+        }
+      }
+      
+      if (!imagePath && config.geminiApiKey && provider !== 'gemini') {
+        logger.info(`🔄 OpenAI failed, trying Gemini...`)
+        usedProvider = 'gemini'
+        fallbackUsed = true
+        imagePath = await generateImageWithGeminiRetry(prompt)
+        if (imagePath) {
+          modelName = 'Google Gemini (Imagen 3)'
+          modelId = 'imagen-3.0'
+        }
+      }
+      
+      if (!imagePath && config.huggingfaceApiKey && provider !== 'huggingface') {
+        logger.info(`🔄 Gemini failed, trying HuggingFace as last resort...`)
+        usedProvider = 'huggingface'
+        fallbackUsed = true
+        imagePath = await generateImageWithModelFallbacks(prompt)
+        if (imagePath) {
+          const fullModelId = config.imageModel
+          modelId = fullModelId
+          
+          if (fullModelId.includes('playground-v2.5')) {
+            modelName = 'Playground v2.5'
+          } else if (fullModelId.includes('flux')) {
+            modelName = 'Flux.1'
+          } else if (fullModelId.includes('sd3') || fullModelId.includes('stable-diffusion-3')) {
+            modelName = 'Stable Diffusion 3'
+          } else if (fullModelId.includes('sdxl') || fullModelId.includes('stable-diffusion-xl')) {
+            modelName = 'Stable Diffusion XL'
+          } else {
+            const parts = fullModelId.split('/')
+            modelName = parts[parts.length - 1].replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+          }
         }
       }
       
       if (!imagePath) {
-        throw new Error('Failed to generate image after retries with all available providers')
+        throw new Error('Failed to generate image after trying all available providers')
       }
       
       const processingTime = Date.now() - startTime

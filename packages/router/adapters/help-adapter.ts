@@ -39,7 +39,7 @@ I can help you with many tasks using just your voice or text!
 • Will connect everything to code, games, or the latest tech trends
   _Example: "Hey! What's up?", "What are you coding?", "Favorite game?"_
 
-**💬 Q&A (Question Answering)**
+**💬 Library Worm (Question Answering)**
 • Simple questions → Fast answers with Groq AI (2-3s)
   _Example: "What is the capital of France?"_
 • Complex questions → Detailed answers with Linkup web search (5-8s)
@@ -64,6 +64,8 @@ I can help you with many tasks using just your voice or text!
 • Translate text between 50+ languages
 • Supports German, Spanish, French, Italian, Portuguese, and more
   _Example: "Translate 'Hello world' to Spanish"_
+
+--------------------------------
 
 **🗣️ How to Use:**
 • **Voice**: Just send a voice message in any language - I'll transcribe and respond with voice!

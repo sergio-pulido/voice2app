@@ -505,16 +505,16 @@ export async function detectIntent(input: RouterInput): Promise<IntentResult> {
  */
 export function getCategoryName(category: IntentCategory): string {
   const names: Record<IntentCategory, string> = {
-    'help': '❓ Help',
-    'friend': '🤖 Barna Hacker',
-    'qa': '💬 Q&A',
-    'app_code': '💻 App Builder',
-    'app_interaction': '🎮 App Tester',
-    'image_gen': '🎨 Image Generator',
-    'video_gen': '🎬 Video Generator',
-    'translate': '🌐 Translator',
-    'project_manager': '📁 Project Manager',
-    'app_analyzer': '🔍 App Analyzer'
+    'help': '❓',
+    'friend': '🤖',
+    'qa': '💬',
+    'app_code': '💻',
+    'app_interaction': '🎮',
+    'image_gen': '🎨',
+    'video_gen': '🎬',
+    'translate': '🌐',
+    'project_manager': '📁',
+    'app_analyzer': '🔍'
   }
   return names[category]
 }

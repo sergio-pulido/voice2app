@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import telegramGateway from './packages/telegram-gateway'
 import discordGateway from './packages/discord-gateway'
-import { logger, showStartupBanner, showMainBanner, showColorizedBanner, showSuccessBanner, showShutdownBanner } from './packages/shared'
+import { logger, showStartupBanner, showColorizedBanner, showSuccessBanner, showShutdownBanner } from './packages/shared'
 
 // Load environment variables from .env file
 import { config } from 'dotenv'

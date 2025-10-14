@@ -54,12 +54,13 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 3000,
-    strictPort: true,
-    hmr: {
-      port: 3001
-    },
+    strictPort: false,
     cors: true,
     middlewareMode: false,
+    allowedHosts: 'all',
+    hmr: {
+      overlay: false,
+    },
     fs: {
       strict: false
     }
@@ -69,27 +70,42 @@ export default defineConfig({
 `
 
 export const VITE_CONFIG_WITH_LINGO = `
-Vite Config Template WITH Lingo:
+Vite Config Template WITH Lingo (robust optional import):
 
 \`\`\`ts
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { lingoCompiler } from 'lingo.dev'
 
 // https://vitejs.dev/config/
-export default defineConfig({
-  plugins: [react(), lingoCompiler.next()],
-  server: {
-    host: '0.0.0.0',
-    port: 3000,
-    strictPort: true,
-    hmr: {
-      port: 3001
-    },
-    cors: true,
-    middlewareMode: false,
-    fs: {
-      strict: false
+export default defineConfig(async () => {
+  let lingoCompiler: any
+  try {
+    // Avoid static resolution by bundlers
+    const dynamicImport = new Function('m', 'return import(m)') as (m: string) => Promise<any>
+    const mod = await dynamicImport('lingo.dev')
+    lingoCompiler = (mod as any)?.lingoCompiler
+  } catch {
+    // Lingo not available or resolution failed; continue without it
+  }
+
+  return {
+    plugins: [
+      react(),
+      lingoCompiler?.next ? lingoCompiler.next() : undefined,
+    ].filter(Boolean),
+    server: {
+      host: '0.0.0.0',
+      port: 3000,
+      strictPort: false,
+      cors: true,
+      middlewareMode: false,
+      allowedHosts: 'all',
+      hmr: {
+        overlay: false,
+      },
+      fs: {
+        strict: false
+      }
     }
   }
 })
@@ -109,12 +125,13 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 3000,
-    strictPort: true,
-    hmr: {
-      port: 3001
-    },
+    strictPort: false,
     cors: true,
     middlewareMode: false,
+    allowedHosts: 'all',
+    hmr: {
+      overlay: false,
+    },
     fs: {
       strict: false
     }
@@ -344,8 +361,7 @@ TSConfig Template (tsconfig.json - 🚨 NO "references" field):
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "include": ["src"]
 }
 \`\`\`
 `

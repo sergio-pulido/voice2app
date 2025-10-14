@@ -1,9 +1,10 @@
 /**
- * Runner package: builds, runs, and screenshots generated apps
+ * Runner package: builds, runs, tests and screenshots generated apps
  */
 
 import { config, logger, type Task, type RunnerResult } from '../shared'
 import { buildApp } from './builder'
+import { testApp } from './tester'
 import { serveApp } from './server'
 import { captureScreenshot } from './screenshot'
 import { createTunnel } from './tunnel'
@@ -18,7 +19,15 @@ export async function runApp(task: Task, sandboxPath: string): Promise<RunnerRes
   try {
     // Step 1: Build the app (if needed) - only for non-Vite projects
     const buildResult = await buildApp(sandboxPath, task.jobId)
-    
+
+    if (!buildResult.success) {
+      return {
+        success: false,
+        logs: buildResult.logs,
+        errors: buildResult.errors,
+      }
+    }
+
     // Step 2: Serve the app (this will build Vite projects internally)
     const serveResult = await serveApp(sandboxPath, task.jobId)
     
@@ -34,8 +43,18 @@ export async function runApp(task: Task, sandboxPath: string): Promise<RunnerRes
     url = serveResult.url
     
     logger.success(`App running at ${url}`)
+
+    // Step 3: Basic tester validation before tunnels/screenshots
+    const basicTest = await testApp(task, url, sandboxPath)
+    if (!basicTest.success) {
+      return {
+        success: false,
+        logs: [...buildResult.logs, ...serveResult.logs, ...basicTest.logs],
+        errors: basicTest.errors,
+      }
+    }
     
-    // Step 3: Create ngrok tunnel for public access
+    // Step 4: Create ngrok/cloudflared tunnel for public access
     let publicUrl: string | undefined
     const tunnelResult = await createTunnel(url, task.jobId)
     if (tunnelResult.success && tunnelResult.publicUrl) {
@@ -45,7 +64,7 @@ export async function runApp(task: Task, sandboxPath: string): Promise<RunnerRes
       logger.warn(`Failed to create public URL: ${tunnelResult.error || 'Unknown error'}`)
     }
     
-    // Step 4: Capture screenshot (if requested)
+    // Step 5: Capture screenshot (if requested)
     let screenshot: string | undefined
     
     if (task.artifact.screenshot) {
@@ -56,7 +75,7 @@ export async function runApp(task: Task, sandboxPath: string): Promise<RunnerRes
       }
     }
     
-    // Step 5: Collect logs
+    // Step 6: Collect logs
     const logs = [...buildResult.logs, ...serveResult.logs]
     
     return {
@@ -86,5 +105,6 @@ export async function runApp(task: Task, sandboxPath: string): Promise<RunnerRes
 export { buildApp } from './builder'
 export { serveApp } from './server'
 export { captureScreenshot } from './screenshot'
+export { testApp } from './tester'
 export { testAppWithInteraction } from './app-interactor'
 
