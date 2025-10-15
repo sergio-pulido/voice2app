@@ -53,11 +53,11 @@ export default defineConfig({
   plugins: [react(){{LINGO_PLUGIN}}],
   server: {
     host: '0.0.0.0',
-    port: 3000,
+    port: 5173,
     strictPort: false,
     cors: true,
     middlewareMode: false,
-    allowedHosts: 'all',
+    allowedHosts: ['localhost', '.ngrok-free.dev', '.trycloudflare.com'],
     hmr: {
       overlay: false,
     },
@@ -95,11 +95,11 @@ export default defineConfig(async () => {
     ].filter(Boolean),
     server: {
       host: '0.0.0.0',
-      port: 3000,
+      port: 5173,
       strictPort: false,
       cors: true,
       middlewareMode: false,
-      allowedHosts: 'all',
+      allowedHosts: ['localhost', '.ngrok-free.dev', '.trycloudflare.com'],
       hmr: {
         overlay: false,
       },
@@ -124,11 +124,11 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: '0.0.0.0',
-    port: 3000,
+    port: 5173,
     strictPort: false,
     cors: true,
     middlewareMode: false,
-    allowedHosts: 'all',
+    allowedHosts: ['localhost', '.ngrok-free.dev', '.trycloudflare.com'],
     hmr: {
       overlay: false,
     },

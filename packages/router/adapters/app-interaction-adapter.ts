@@ -6,6 +6,7 @@ import { logger } from '../../shared'
 import { testAppWithInteraction } from '../../runner/app-interactor'
 import { serveApp } from '../../runner/server'
 import { getUserAppSession, updateSessionTimestamp } from '../services/session-store'
+import { getInteractionSession } from '../../shared/interaction-state-manager'
 import type { Adapter, AdapterInput, AdapterOutput } from '../types'
 
 export class AppInteractionAdapter implements Adapter {
@@ -16,9 +17,28 @@ export class AppInteractionAdapter implements Adapter {
     
     try {
       // Get app session data
-      const session = getUserAppSession(input.userId)
+      let session = getUserAppSession(String(input.userId))
+      console.log('session', session)
       
-      if (!session || !session.appUrl) {
+      if (!session || (!session.appUrl && !session.sandboxPath)) {
+        // Try interaction-state fallback (after project details)
+        const inter = getInteractionSession(input.userId)
+        if (inter) {
+          session = {
+            userId: String(input.userId),
+            appUrl: inter.publicUrl,
+            appContext: 'Project session',
+            jobId: inter.jobId,
+            sandboxPath: inter.sandboxPath,
+            screenshotPath: undefined,
+            appCode: undefined,
+            lastUpdated: Date.now(),
+          } as any
+        }
+      }
+
+      if (!session || (!session.appUrl && !session.sandboxPath)) {
+        logger.error('No active app found')
         return {
           summaryText: `❌ No active app found. Please generate an app first!\n\n💡 Try saying: "Create a calculator app" or "Generate a todo list"`,
           metadata: {
@@ -30,7 +50,7 @@ export class AppInteractionAdapter implements Adapter {
       }
       
       // Update session timestamp
-      updateSessionTimestamp(input.userId)
+      updateSessionTimestamp(String(input.userId))
       
       const { appUrl, appContext, jobId, sandboxPath, screenshotPath, appCode } = session
       
@@ -45,25 +65,21 @@ export class AppInteractionAdapter implements Adapter {
       
       // Start server if needed (the URL might be stale)
       let workingUrl = appUrl
-      try {
-        // Try to connect to existing URL with longer timeout
-        logger.info(`Checking if app server is running at ${appUrl}...`)
-        const response = await fetch(appUrl, { 
-          signal: AbortSignal.timeout(5000),
-          headers: { 'User-Agent': 'Voice2App-Tester' }
-        })
-        if (!response.ok) {
-          throw new Error(`Server responded with ${response.status}`)
-        }
-        logger.info('✅ App server is running')
-      } catch (error) {
-        // Server not running, start it
-        logger.warn(`❌ Server not accessible: ${error.message}`)
-        logger.info(`Starting server for job ${jobId}...`)
-        
+      if (appUrl) {
         try {
-          const serveResult = await serveApp(sandboxPath || `sandbox/${jobId}`, jobId)
-
+          logger.info(`Checking if app server is running at ${appUrl}...`)
+          const response = await fetch(appUrl, { 
+            signal: AbortSignal.timeout(5000),
+            headers: { 'User-Agent': 'Voice2App-Tester' }
+          })
+          if (!response.ok) {
+            throw new Error(`Server responded with ${response.status}`)
+          }
+          logger.info('✅ App server is running')
+        } catch (error) {
+          logger.warn(`❌ Server not accessible: ${error instanceof Error ? error.message : String(error)}`)
+          logger.info(`Starting server for job ${jobId}...`)
+          const serveResult = await serveApp(sandboxPath || `sandbox/${jobId}`, jobId || 'unknown')
           if (!serveResult.success || !serveResult.url) {
             return {
               summaryText: `❌ Could not start the app server. The app might have been cleaned up.\n\n💡 Please generate a new app by saying: "Create a calculator app"`,
@@ -74,11 +90,13 @@ export class AppInteractionAdapter implements Adapter {
               }
             }
           }
-
           workingUrl = serveResult.url
           logger.info(`✅ App server restarted at ${workingUrl}`)
-        } catch (serveError) {
-          logger.error('Failed to start server:', serveError)
+        }
+      } else {
+        logger.info(`No appUrl in session, starting server from sandbox for job ${jobId}...`)
+        const serveResult = await serveApp(sandboxPath || `sandbox/${jobId}`, jobId || 'unknown')
+        if (!serveResult.success || !serveResult.url) {
           return {
             summaryText: `❌ Could not start the app server. Please generate a new app.\n\n💡 Try saying: "Create a calculator app"`,
             metadata: {
@@ -88,14 +106,16 @@ export class AppInteractionAdapter implements Adapter {
             }
           }
         }
+        workingUrl = serveResult.url
+        logger.info(`✅ App server started at ${workingUrl}`)
       }
       
       // Test the app with user's request
       const videoPath = await testAppWithInteraction(
-        workingUrl,
-        jobId,
+        workingUrl || '',
+        jobId || 'unknown',
         cleanRequest,
-        appContext,
+        appContext || '',
         screenshotPath,
         appCode
       )
@@ -119,10 +139,17 @@ export class AppInteractionAdapter implements Adapter {
         `• Result: See video below! 🎥\n\n` +
         `Want to test something else? Just ask! 🚀`
       
+      // Prepare attachments: include both screenshot (if available) and video
+      const attachments: string[] = []
+      if (screenshotPath) {
+        attachments.push(screenshotPath)
+      }
+      attachments.push(videoPath)
+      
       return {
         summaryText: message,
         ttsText: `Successfully tested the app with your request`,
-        attachments: [videoPath],
+        attachments,
         metadata: {
           category: 'app_interaction',
           processingTime: Date.now() - startTime,

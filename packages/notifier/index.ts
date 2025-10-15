@@ -96,14 +96,14 @@ export async function sendNotification(payload: NotificationPayload): Promise<bo
       await sendMessageWithSplitting(payload.chatId, payload.text, payload.channel || 'telegram')
     }
     
-    // Send screenshot or video if provided
+    // Send screenshot if provided
     if (payload.screenshot) {
-      // Check if it's a video file
-      if (payload.screenshot.endsWith('.mp4') || payload.screenshot.endsWith('.webm')) {
-        await sendVideo(payload.chatId, payload.screenshot)
-      } else {
-        await sendPhoto(payload.chatId, payload.screenshot)
-      }
+      await sendPhoto(payload.chatId, payload.screenshot)
+    }
+    
+    // Send screen recording (video) if provided
+    if (payload.screenrecording) {
+      await sendVideo(payload.chatId, payload.screenrecording)
     }
     
     logger.success('Notification sent successfully')

@@ -194,6 +194,48 @@ Requirements:
 - Include all dependencies in package.json
 - Make it fully responsive and accessible
 
+🚨 CRITICAL - REQUIRED FILES (app will fail without these):
+1. index.html - MUST be in project root with:
+   <!DOCTYPE html>
+   <html lang="en">
+     <head>
+       <meta charset="UTF-8" />
+       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+       <title>App Title</title>
+     </head>
+     <body>
+       <div id="root"></div>
+       <script type="module" src="/src/main.tsx"></script>
+     </body>
+   </html>
+
+2. package.json devDependencies MUST include:
+   - "@vitejs/plugin-react": "^4.2.1" (REQUIRED for vite.config.ts)
+   - "vite": "^5.0.8"
+   - "typescript": "^5.2.2"
+   - "@types/react": "^18.2.43"
+   - "@types/react-dom": "^18.2.17"
+   - "tailwindcss": "^3.3.6"
+   - "autoprefixer": "^10.4.16"
+   - "postcss": "^8.4.32"
+
+3. vite.config.ts MUST import from '@vitejs/plugin-react' AND include server config:
+   import { defineConfig } from 'vite';
+   import react from '@vitejs/plugin-react';
+
+   export default defineConfig({
+     plugins: [react()],
+     server: {
+       host: '0.0.0.0',
+       port: 5173,
+       strictPort: false,
+       allowedHosts: ['localhost', '.ngrok-free.dev', '.trycloudflare.com']
+     }
+   });
+
+WITHOUT index.html THE APP WILL RETURN 404 AND COMPLETELY FAIL!
+WITHOUT proper server config, ngrok tunnels will be blocked!
+
 The application should be complete and ready to run immediately.`
 }
 
@@ -214,7 +256,11 @@ export async function generateCode(task: Task): Promise<GeneratedFile[]> {
     logger.job(task.jobId, 'Generating code with LLM...')
     
     // Build system and user prompts
-    const systemPrompt = buildSystemPrompt(task)
+    const systemPrompt = buildSystemPrompt({
+      templateId: task.template.id,
+      healthcheckPath: task.template.healthcheckPath,
+      entryPoints: task.template.entryPoints
+    })
     const userPrompt = buildPrompt(task)
 
     // Create LLM provider
@@ -287,12 +333,19 @@ export async function generateCode(task: Task): Promise<GeneratedFile[]> {
         // Remove any remaining template literals that might have been missed
         finalResult = finalResult.replace(/`([^`]*)`/g, '"$1"')
 
-        // Fix common JSON syntax issues
-        finalResult = finalResult.replace(/,\s*}/g, '}')  // Remove trailing commas
-        finalResult = finalResult.replace(/,\s*]/g, ']')  // Remove trailing commas
+      // Fix common JSON syntax issues
+      finalResult = finalResult.replace(/,\s*}/g, '}')  // Remove trailing commas
+      finalResult = finalResult.replace(/,\s*]/g, ']')  // Remove trailing commas
 
-        // The LLM is using \\\" which becomes \" after one pass, then we need to keep it as \"
-        // Don't touch the backslashes anymore - they should be correct now
+      // Fix unescaped quotes in HTML content that break JSON
+      finalResult = finalResult.replace(/"content":\s*"([^"]*<[^"]*"[^"]*>[^"]*)"/g, (match, content) => {
+        // Escape quotes within HTML content
+        const escapedContent = content.replace(/"/g, '\\"')
+        return `"content": "${escapedContent}"`
+      })
+
+      // The LLM is using \\\" which becomes \" after one pass, then we need to keep it as \"
+      // Don't touch the backslashes anymore - they should be correct now
 
         // Try to balance braces and brackets
         const openBraces = (finalResult.match(/\{/g) || []).length
@@ -455,7 +508,8 @@ function getFallbackApp(task: Task): GeneratedFile[] {
   return [
     {
       path: 'index.html',
-      content: FALLBACK_APP_HTML
+      content: FALLBACK_APP_HTML,
+      language: 'html'
     }
   ]
 }

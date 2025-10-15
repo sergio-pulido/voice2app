@@ -2,7 +2,7 @@
  * App Interactor: Automates interactions with generated apps
  */
 
-import { logger, config } from '../shared'
+import { logger, config, type LLMMessage } from '../shared'
 import { chromium } from 'playwright'
 import { join } from 'path'
 import { mkdir } from 'fs/promises'
@@ -84,16 +84,25 @@ export async function testAppWithInteraction(
     const artifactsPath = join(process.cwd(), config.artifactsRoot)
     await mkdir(artifactsPath, { recursive: true })
     
-    const videoPath = join(artifactsPath, `${jobId}_interaction.mp4`)
+    // Grab handle BEFORE closing page; finalize after close
+    const videoHandle = page.video()
     
     // Close page to finalize video recording
     await page.close()
     
-    // Get video path from page context
-    const video = page.video()
-    if (video) {
-      await video.saveAs(videoPath)
-      await video.delete()
+    // Persist video (Playwright records WebM)
+    let videoPath = join(artifactsPath, `${jobId}_interaction.webm`)
+    if (videoHandle) {
+      try {
+        await videoHandle.saveAs(videoPath)
+        await videoHandle.delete()
+      } catch (e) {
+        // Fallback to original path if saveAs fails
+        const p = await videoHandle.path().catch(() => null)
+        if (p) {
+          videoPath = p
+        }
+      }
     }
     
     await browser.close()
@@ -112,14 +121,15 @@ export async function testAppWithInteraction(
     }
     
     // Provide more specific error information
-    if (error.message.includes('net::ERR_CONNECTION_REFUSED')) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    if (errorMessage.includes('net::ERR_CONNECTION_REFUSED')) {
       logger.error('❌ Cannot connect to app server - it might not be running')
-    } else if (error.message.includes('Timeout')) {
+    } else if (errorMessage.includes('Timeout')) {
       logger.error('❌ App interaction timed out - server might be slow')
-    } else if (error.message.includes('selector')) {
+    } else if (errorMessage.includes('selector')) {
       logger.error('❌ Could not find UI elements - app interface might have changed')
     } else {
-      logger.error('❌ Unknown interaction error:', error.message)
+      logger.error('❌ Unknown interaction error:', errorMessage)
     }
     
     return null
@@ -256,7 +266,7 @@ Make the test realistic and demonstrate the app's main functionality based on th
         role: 'user',
         content: analysisContext
       }
-    ]
+    ] as LLMMessage[]
     
     const response = await llm.complete({ 
       messages: prompt, 

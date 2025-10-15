@@ -96,8 +96,10 @@ export interface NotificationPayload {
   chatId: number
   text: string
   screenshot?: string
+  screenrecording?: string  // Video recording path (e.g., from app interaction)
   voice?: boolean
   channel?: string  // 'telegram', 'whatsapp', 'discord', 'slack', etc.
+  discordToken?: string  // For Discord deferred responses
 }
 
 export interface STTResult {

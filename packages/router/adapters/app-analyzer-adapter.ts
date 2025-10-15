@@ -11,6 +11,8 @@ import { APP_ANALYSIS_PROMPT } from '../../shared/prompts'
 import { readFile } from 'fs/promises'
 import { join } from 'path'
 import { updateProject } from '../../shared/project-db'
+import { setUserAppSession } from '../services/session-store'
+import { startInteractionSession } from '../../shared/interaction-state-manager'
 import type { Adapter, AdapterInput, AdapterOutput } from '../types'
 
 export class AppAnalyzerAdapter implements Adapter {
@@ -86,6 +88,30 @@ export class AppAnalyzerAdapter implements Adapter {
       
       // Step 5: Update project in database
       await this.updateProjectDetails(project, analysisResult, screenshotPath, runResult.publicUrl)
+
+      // Step 6: Set active app session for immediate interaction (works even if intent routes to analyzer)
+      try {
+        const sandboxPath = join(process.cwd(), 'sandbox', project.folderName)
+        setUserAppSession(
+          String(input.userId),
+          runResult.url || '',
+          analysisResult.summary || project.title,
+          String(project.jobId || project.id),
+          sandboxPath,
+          screenshotPath,
+          undefined
+        )
+        startInteractionSession(input.userId, {
+          projectId: project.id,
+          jobId: project.jobId,
+          folderName: project.folderName,
+          publicUrl: runResult.publicUrl,
+          sandboxPath,
+        })
+        console.log('[analyzer] set active session from analyzer for user', input.userId, 'project', project.id)
+      } catch (e) {
+        console.log('[analyzer] failed to set session', e)
+      }
       
       const processingTime = Date.now() - startTime
       

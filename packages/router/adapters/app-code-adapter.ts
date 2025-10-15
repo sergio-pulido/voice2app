@@ -14,6 +14,7 @@ import { readFile, writeFile, mkdir } from 'fs/promises'
 import { join, dirname } from 'path'
 import { createLLMProvider } from '../../codegen/providers'
 import type { Adapter, AdapterInput, AdapterOutput } from '../types'
+import type { AnalysisResult, LLMMessage } from '../../shared'
 
 export class AppCodeAdapter implements Adapter {
   private parseEnvelopeFiles(input: string): Array<{ path: string; content: string; language?: string }> {
@@ -169,15 +170,18 @@ Now return only the envelope blocks for files to add or modify.`
       console.log('runnerResult', runnerResult)
 
       let appTestSuccess = runnerResult.success
+      let analysisResult: AnalysisResult | null = null
 
       // STEP 4: Analyze results
       if (!appTestSuccess) {
-        logger.error(`❌ Failed to run app: ${runnerResult.errors?.join('\n') || 'Unknown error'}`)
+        logger.error(`Failed to run app: ${runnerResult.errors?.join('\n') || 'Unknown error'}`)
         
         // Iteratively refine if features are missing
         const maxIterations = 3
         let iteration = 0
-        while (iteration < maxIterations && analysisResult.status !== 'success') {
+        // Initialize analysis before refinement loop
+        analysisResult = await analyzeResults(task, runnerResult)
+        while (iteration < maxIterations && analysisResult && analysisResult.status !== 'success') {
           iteration++
           logger.warn(`🔁 Refinement iteration ${iteration}/${maxIterations} - improving missing features...`)
           const checksFailed = analysisResult.checksFailed?.length ? analysisResult.checksFailed : []
@@ -185,11 +189,12 @@ Now return only the envelope blocks for files to add or modify.`
 
           const llm = createLLMProvider()
           const refinePrompt = await this.buildRefinePrompt(task, analysisResult.summary, checksFailed, sandboxPath, runnerResult.logs || [], runnerResult.errors || [])
+          const refineMessages: LLMMessage[] = [
+            { role: 'system', content: 'Return ONLY envelope file blocks as specified. No prose.' },
+            { role: 'user', content: refinePrompt }
+          ]
           const completion = await llm.complete({
-            messages: [
-              { role: 'system', content: 'Return ONLY envelope file blocks as specified. No prose.' },
-              { role: 'user', content: refinePrompt }
-            ],
+            messages: refineMessages,
             temperature: 0.2,
             maxTokens: 6000,
           })
@@ -204,11 +209,12 @@ Now return only the envelope blocks for files to add or modify.`
           // Re-run
           runnerResult = await runApp(task, sandboxPath)
           appTestSuccess = runnerResult.success
+          // Re-analyze after re-run
+          analysisResult = await analyzeResults(task, runnerResult)
         }
       }
 
-      let analysisResult = null
-      if (appTestSuccess) {
+      if (!analysisResult) {
         logger.info('📊 STEP 4: Analyzing results...')
         analysisResult = await analyzeResults(task, runnerResult)
       }
@@ -259,7 +265,7 @@ Now return only the envelope blocks for files to add or modify.`
         }
         
         setUserAppSession(
-          input.userId,
+          String(input.userId),
           runnerResult.url,
           task.context,
           task.jobId,
@@ -279,7 +285,7 @@ Now return only the envelope blocks for files to add or modify.`
         // Enrich metadata with LLM if needed
         try {
           const llm = createLLMProvider()
-          const prompt = [
+          const prompt: LLMMessage[] = [
             { role: 'system', content: 'You generate concise metadata for an app project log. Return strict JSON with keys: title (≤60 chars), description (one short line ≤140 chars), summary (2-4 sentences). Do not include markdown, backticks, or extra text.' },
             { role: 'user', content: `Task context: ${task.context}\nStatus: ${analysisResult?.status || 'N/A'}\nAnalysis summary: ${analysisResult?.summary || 'N/A'}\nBuild errors: ${(runnerResult.errors || []).join('\n').slice(0, 1000)}` }
           ]
@@ -312,15 +318,20 @@ Now return only the envelope blocks for files to add or modify.`
       
       const processingTime = Date.now() - startTime
       
+      const mappedStatus: 'success' | 'partial' | 'error' | 'unconfigured' =
+        analysisResult?.status === 'failed'
+          ? 'error'
+          : (analysisResult?.status as 'success' | 'partial') || (appTestSuccess ? 'partial' : 'error')
+
       return {
         summaryText: message,
-        ttsText: analysisResult.summary.substring(0, 400), // Shorter for voice
+        ttsText: analysisResult?.summary?.substring(0, 400) || task.context.substring(0, 200),
         attachments: runnerResult.screenshot ? [runnerResult.screenshot] : [],
         metadata: {
           category: 'app_code',
           processingTime,
           filesGenerated: codegenResult.files?.length || 0,
-          status: analysisResult.status,
+          status: mappedStatus,
           project: task.project,
           intent: task.intent,
           jobId: task.jobId,

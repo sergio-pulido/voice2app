@@ -49,7 +49,15 @@ export async function orchestrate(options: OrchestrateOptions): Promise<void> {
     // Send acknowledgment based on platform
     const { sendAcknowledgment, sendNotification, sendError } = await getPlatformNotifier(platform)
     
-    await sendAcknowledgment(chatId, voiceBuffer ? 'voice' : 'text', discordToken)
+    // Discord needs the token, Telegram doesn't
+    if (platform === 'discord') {
+      // Discord sendAcknowledgment accepts 3 params
+      await (sendAcknowledgment as any)(chatId, voiceBuffer ? 'voice' : 'text', discordToken)
+    } else {
+      // Telegram - chatId must be a number
+      const telegramChatId = typeof chatId === 'number' ? chatId : parseInt(chatId) || 0
+      await sendAcknowledgment(telegramChatId, voiceBuffer ? 'voice' : 'text')
+    }
     
     // Prepare input for router
     const messageType = voiceBuffer ? 'voice' : 'text'
@@ -86,11 +94,29 @@ export async function orchestrate(options: OrchestrateOptions): Promise<void> {
     // Build customer notification message (bold category name)
     let customerMessage = `**${categoryName}**\n\n${result.summaryText}`
     
+    // Separate video recordings from screenshots
+    let screenshotPath: string | undefined
+    let screenrecordingPath: string | undefined
+    
+    if (result.attachments && result.attachments.length > 0) {
+      for (const attachment of result.attachments) {
+        if (attachment.endsWith('.mp4') || attachment.endsWith('.webm')) {
+          screenrecordingPath = attachment
+        } else {
+          screenshotPath = attachment
+        }
+      }
+    }
+    
     // Send result to customer
+    // Ensure chatId is a number for the payload
+    const numericChatId = typeof chatId === 'number' ? chatId : parseInt(chatId) || 0
+    
     await sendNotification({
-      chatId,
+      chatId: numericChatId,
       text: customerMessage,
-      screenshot: result.attachments?.[0], // First attachment if any
+      screenshot: screenshotPath,
+      screenrecording: screenrecordingPath,
       voice: !!voiceBuffer,  // Send voice response if input was voice
       channel: platform,
       discordToken
@@ -143,7 +169,14 @@ export async function orchestrate(options: OrchestrateOptions): Promise<void> {
     
     // Send error to customer
     const { sendError } = await getPlatformNotifier(platform)
-    await sendError(chatId, errorMessage, discordToken)
+    if (platform === 'discord') {
+      // Discord sendError accepts 3 params
+      await (sendError as any)(chatId, errorMessage, discordToken)
+    } else {
+      // Telegram - chatId must be a number
+      const telegramChatId = typeof chatId === 'number' ? chatId : parseInt(chatId) || 0
+      await sendError(telegramChatId, errorMessage)
+    }
     
     // Send detailed error notification to admin
     await sendAdminNotification(

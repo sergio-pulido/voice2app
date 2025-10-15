@@ -8,7 +8,8 @@ import {
   Project 
 } from '../../shared/project-db'
 import { config } from '../../shared/config'
-import { getUserProjectListState, setUserProjectListState } from '../services/session-store'
+import { getUserProjectListState, setUserProjectListState, setUserAppSession } from '../services/session-store'
+import { startInteractionSession } from '../../shared/interaction-state-manager'
 
 interface ProjectManagerRequest {
   action: 'list' | 'details' | 'search' | 'stats' | 'more'
@@ -318,6 +319,29 @@ export class ProjectManagerAdapter {
     // Add screenshot if available
     if (project.screenshotPath) {
       result.attachments = [project.screenshotPath]
+    }
+
+    // Set active app session for immediate interaction
+    try {
+      const sandboxPath = project.folderName ? require('path').join(process.cwd(), 'sandbox', project.folderName) : undefined
+      setUserAppSession(
+        String(userId),
+        project.publicUrl || '',
+        project.summary || project.title || 'App Project',
+        project.jobId || String(project.id),
+        sandboxPath,
+        project.screenshotPath,
+        undefined
+      )
+      startInteractionSession(userId, {
+        projectId: project.id,
+        jobId: project.jobId,
+        folderName: project.folderName,
+        publicUrl: project.publicUrl,
+        sandboxPath,
+      })
+    } catch (e) {
+      // best-effort; don't fail details on session set issues
     }
     
     return result
