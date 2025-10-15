@@ -293,14 +293,14 @@ Return ONLY the raw JSON object, nothing else.`
     ]
     
     const response = await llm.complete({
-      messages: prompt,
+      messages: prompt as any,
       temperature: 0.2,
       maxTokens: 500
     })
     
     try {
       // Clean the response - remove any markdown backticks or extra text
-      let cleanResponse = response.content.trim()
+      let cleanResponse = response.content?.trim() || ''
       
       // Remove markdown code blocks if present
       if (cleanResponse.startsWith('```json')) {

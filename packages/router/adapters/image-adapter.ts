@@ -101,7 +101,7 @@ export class ImageAdapter implements Adapter {
       // Fallback chain: fal.ai → OpenAI → Gemini → HuggingFace
       if (!imagePath && config.falApiKey) {
         logger.info(`🔄 Primary failed, trying fal.ai...`)
-        usedProvider = 'fal'
+        usedProvider = 'fal' as any
         fallbackUsed = true
         imagePath = await generateImageWithFalRetry(prompt)
         if (imagePath) {
@@ -112,7 +112,7 @@ export class ImageAdapter implements Adapter {
       
       if (!imagePath && config.openaiApiKey) {
         logger.info(`🔄 fal.ai failed, trying OpenAI DALL-E...`)
-        usedProvider = 'openai'
+        usedProvider = 'openai' as any
         fallbackUsed = true
         imagePath = await generateImageWithOpenAIRetry(prompt)
         if (imagePath) {
@@ -123,7 +123,7 @@ export class ImageAdapter implements Adapter {
       
       if (!imagePath && config.geminiApiKey && provider !== 'gemini') {
         logger.info(`🔄 OpenAI failed, trying Gemini...`)
-        usedProvider = 'gemini'
+        usedProvider = 'gemini' as any
         fallbackUsed = true
         imagePath = await generateImageWithGeminiRetry(prompt)
         if (imagePath) {
@@ -134,7 +134,7 @@ export class ImageAdapter implements Adapter {
       
       if (!imagePath && config.huggingfaceApiKey && provider !== 'huggingface') {
         logger.info(`🔄 Gemini failed, trying HuggingFace as last resort...`)
-        usedProvider = 'huggingface'
+        usedProvider = 'huggingface' as any
         fallbackUsed = true
         imagePath = await generateImageWithModelFallbacks(prompt)
         if (imagePath) {

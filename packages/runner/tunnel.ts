@@ -173,9 +173,9 @@ async function createNgrokTunnel(port: string, jobId: string): Promise<TunnelRes
         try {
           const response = await fetch('http://localhost:4040/api/tunnels')
           if (response.ok) {
-            const data = await response.json()
+            const data = await response.json() as { tunnels?: Array<{ proto: string; public_url: string }> }
             const tunnels = data.tunnels || []
-            const httpsTunnel = tunnels.find((t: any) => t.proto === 'https')
+            const httpsTunnel = tunnels.find((t) => t.proto === 'https')
             if (httpsTunnel && httpsTunnel.public_url) {
               clearTimeout(apiTimeout)
               resolve(httpsTunnel.public_url)

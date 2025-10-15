@@ -65,7 +65,7 @@ export async function generateImageWithGemini(prompt: string): Promise<string> {
       throw new Error(`Gemini API error (${response.status}): ${errorText}`)
     }
     
-    const data = await response.json()
+    const data = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ inline_data?: { mime_type?: string; data?: string } }> } }> }
     
     // Check if we got an image in the response
     if (data.candidates && data.candidates[0]?.content?.parts) {
@@ -75,7 +75,7 @@ export async function generateImageWithGemini(prompt: string): Promise<string> {
       for (const part of parts) {
         if (part.inline_data && part.inline_data.mime_type?.startsWith('image/')) {
           const imageData = part.inline_data.data
-          const buffer = Buffer.from(imageData, 'base64')
+          const buffer = Buffer.from(imageData || '', 'base64')
           
           // Save to artifacts directory
           const timestamp = Date.now()

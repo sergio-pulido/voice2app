@@ -75,7 +75,7 @@ export async function splitMessageForChannel(
     
     const prompt = [
       {
-        role: 'system',
+        role: 'system' as const,
         content: `You are an expert at splitting long messages into smaller, coherent parts while preserving all important information.
 
 TASK: Split the given message into multiple smaller messages that fit within the character limit.
@@ -95,7 +95,7 @@ CRITICAL: Return ONLY a valid JSON array of strings. Do not include markdown bac
 Example: ["Part 1 content...", "...Part 2 content"]`
       },
       {
-        role: 'user',
+        role: 'user' as const,
         content: `Split this message for ${limits.name} (max ${limits.maxLength} chars per message, max ${limits.maxMessages} messages):
 
 ${message}`

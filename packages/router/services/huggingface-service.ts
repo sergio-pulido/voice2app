@@ -28,19 +28,19 @@ function getClient(): HfInference {
  * Generate an image from text prompt
  * Returns the file path where the image was saved
  */
-export async function generateImage(prompt: string): Promise<string> {
+export async function generateImage(prompt: string, model?: string): Promise<string> {
   try {
     logger.info(`🎨 Generating image: "${prompt.substring(0, 50)}..."`)
     
     const client = getClient()
     
-    // Use configurable model from environment (defaults to Playground v2.5 for better quality)
-    const model = config.imageModel
+    // Use provided model or fall back to config
+    const modelToUse = model || config.imageModel
     
-    logger.info(`Using HuggingFace model: ${model}`)
+    logger.info(`Using HuggingFace model: ${modelToUse}`)
     
     const response = await client.textToImage({
-      model,
+      model: modelToUse,
       inputs: prompt,
       parameters: {
         negative_prompt: 'blurry, bad quality, distorted, ugly, watermark, text',
@@ -97,13 +97,14 @@ export async function generateImage(prompt: string): Promise<string> {
  */
 export async function generateImageWithRetry(
   prompt: string,
-  maxRetries: number = 3
+  maxRetries: number = 3,
+  model?: string
 ): Promise<string | null> {
   let lastError: Error | null = null
   
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      return await generateImage(prompt)
+      return await generateImage(prompt, model)
     } catch (error: any) {
       lastError = error
       const errorMsg = error?.message || 'Unknown error'
@@ -152,12 +153,8 @@ export async function generateImageWithModelFallbacks(
   for (const model of uniqueModels) {
     logger.info(`🎨 Trying model: ${model}`)
     
-    // Temporarily override the config model
-    const originalModel = config.imageModel
-    config.imageModel = model
-    
     try {
-      const result = await generateImageWithRetry(prompt, maxRetries)
+      const result = await generateImageWithRetry(prompt, maxRetries, model)
       if (result) {
         logger.success(`✅ Success with model: ${model}`)
         return result
@@ -170,12 +167,8 @@ export async function generateImageWithModelFallbacks(
       if (errorMsg.includes('quota') || errorMsg.includes('credits') || errorMsg.includes('exceeded')) {
         logger.warn('⚠️  Quota error detected - skipping remaining HuggingFace models')
         quotaError = true
-        config.imageModel = originalModel
         break
       }
-    } finally {
-      // Restore original model
-      config.imageModel = originalModel
     }
   }
   

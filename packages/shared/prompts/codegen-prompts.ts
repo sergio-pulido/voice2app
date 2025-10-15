@@ -69,6 +69,23 @@ export default defineConfig({
 \`\`\`
 `
 
+export const TSCONFIG_NODE_TEMPLATE = `
+TypeScript Node Config Template (tsconfig.node.json):
+
+\`\`\`json
+{
+  "compilerOptions": {
+    "composite": true,
+    "skipLibCheck": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true
+  },
+  "include": ["vite.config.ts"]
+}
+\`\`\`
+`
+
 export const VITE_CONFIG_WITH_LINGO = `
 Vite Config Template WITH Lingo (robust optional import):
 

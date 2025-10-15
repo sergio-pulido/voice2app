@@ -26,7 +26,7 @@ export interface TelegramUpdate {
   callback_query?: any
 }
 
-export type TemplateId = 'vite-react-canvas' | 'nextjs-basic-ui' | 'vanilla-ts-canvas' | 'none';
+export type TemplateId = 'vite-react-canvas' | 'vite-react-canvas-app' | 'nextjs-basic-ui' | 'vanilla-ts-canvas' | 'none';
 
 export type Task = {
   jobId: string;

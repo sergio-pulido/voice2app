@@ -43,7 +43,7 @@ export async function generateImageWithOpenAI(prompt: string): Promise<string> {
       throw new Error(`OpenAI API error (${response.status}): ${errorText}`)
     }
     
-    const data = await response.json()
+    const data = await response.json() as { data?: Array<{ url?: string }> }
     
     // Check if we got an image URL in the response
     if (!data.data || data.data.length === 0) {
@@ -54,7 +54,7 @@ export async function generateImageWithOpenAI(prompt: string): Promise<string> {
     
     // Download the image
     logger.info(`📥 Downloading image from OpenAI...`)
-    const imageResponse = await fetch(imageUrl)
+    const imageResponse = await fetch(imageUrl || '')
     
     if (!imageResponse.ok) {
       throw new Error(`Failed to download image: ${imageResponse.statusText}`)

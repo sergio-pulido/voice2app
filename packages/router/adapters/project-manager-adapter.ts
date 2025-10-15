@@ -232,7 +232,7 @@ export class ProjectManagerAdapter {
     // Advance stored page for subsequent "show more" calls
     setUserProjectListState(String(userId), currentPage + 1, pageSize)
 
-    let message = `📁 **Your Projects - Page ${currentPage}** (${projects.length} total)\n\n`
+    let message = `**Your Projects - Page ${currentPage}** (${projects.length} total)\n\n`
     
     // Use the shared formatting function for consistency
     message += this.formatProjectsList(displayProjects)
@@ -291,7 +291,7 @@ export class ProjectManagerAdapter {
                        project.status === 'partial' ? '⚠️' : '❌'
     const date = new Date(project.createdAt).toLocaleString()
     
-    let message = `📁 **Project Details**\n\n`
+    let message = `**Project Details**\n\n`
     message += `${statusEmoji} **${project.title}**\n\n`
     message += `🆔 **ID**: ${project.id}\n`
     message += `📁 **Folder**: ${project.folderName}\n`
@@ -303,10 +303,6 @@ export class ProjectManagerAdapter {
     if (project.publicUrl) {
       message += `🌐 **Live URL**: ${project.publicUrl}\n\n`
     }
-    
-    message += `💡 **Commands:**\n`
-    message += `• "List my projects" - See all projects\n`
-    message += `• "Search for [keyword]" - Find projects\n`
     
     const result: AdapterOutput = {
       summaryText: message,

@@ -119,6 +119,17 @@ export async function serveApp(sandboxPath: string, jobId: string): Promise<Serv
       })
 
       let serverReady = false
+      let processExited = false
+      let exitCode: number | null = null
+
+      // Monitor process exit
+      devProcess.on('close', (code) => {
+        processExited = true
+        exitCode = code
+        if (code !== 0) {
+          logs.push(`[DEV] Process exited with code ${code}`)
+        }
+      })
 
       devProcess.stdout?.on('data', (data) => {
         const output = data.toString()
@@ -136,14 +147,61 @@ export async function serveApp(sandboxPath: string, jobId: string): Promise<Serv
         if (output.includes('Local:') || output.includes('ready in') || output.includes('localhost')) {
           serverReady = true
         }
+        // Check for import resolution errors in stderr
+        if (output.includes('Failed to resolve import') || 
+            output.includes('Could not resolve') ||
+            output.includes('Module not found') ||
+            output.includes('Cannot resolve module') ||
+            output.includes('The following dependencies are imported but could not be resolved')) {
+          // Don't set serverReady to true if there are import errors
+          logs.push(`[DEV] Import error detected: ${output.trim()}`)
+        }
       })
 
       // Wait for server to be ready
       const maxWaitTime = 20000 // 20 seconds max for dev server
       const startTime = Date.now()
 
-      while (!serverReady && (Date.now() - startTime) < maxWaitTime) {
+      while (!serverReady && !processExited && (Date.now() - startTime) < maxWaitTime) {
         await new Promise((resolve) => setTimeout(resolve, 500))
+
+        // Check if process exited unexpectedly
+        if (processExited && exitCode !== 0) {
+          const errMsg = `Vite dev server process exited with code ${exitCode}`
+          logger.error(errMsg)
+          errors.push(errMsg)
+          return {
+            success: false,
+            logs,
+            errors,
+          }
+        }
+
+        // Check for import errors in logs during wait
+        const hasImportErrorsInLogs = logs.some(log => 
+          log.includes('Failed to resolve import') ||
+          log.includes('Could not resolve') ||
+          log.includes('Module not found') ||
+          log.includes('Cannot resolve module') ||
+          log.includes('The following dependencies are imported but could not be resolved')
+        )
+
+        if (hasImportErrorsInLogs) {
+          const errMsg = 'Vite dev server has import resolution errors (detected during startup)'
+          logger.error(errMsg)
+          errors.push(errMsg)
+          try { 
+            logger.warn('Killing dev process due to import errors during startup')
+            devProcess.kill() } 
+          catch {
+            logger.warn('Failed to kill dev process')
+          }
+          return {
+            success: false,
+            logs,
+            errors,
+          }
+        }
 
         // Try to connect to the port
         try {
@@ -158,14 +216,53 @@ export async function serveApp(sandboxPath: string, jobId: string): Promise<Serv
       }
 
       if (!serverReady) {
-        logger.warn(`Dev server may not be fully ready after ${maxWaitTime}ms, proceeding anyway`)
-        logger.warn('Dev server logs:', logs.slice(-10)) // Show last 10 logs
+        if (processExited) {
+          const errMsg = `Vite dev server process exited before becoming ready (exit code: ${exitCode})`
+          logger.error(errMsg)
+          errors.push(errMsg)
+          return {
+            success: false,
+            logs,
+            errors,
+          }
+        } else {
+          logger.warn(`Dev server may not be fully ready after ${maxWaitTime}ms, proceeding anyway`)
+          logger.warn('Dev server logs:', logs.slice(-10)) // Show last 10 logs
+        }
+      }
+
+      // Check for import errors in the logs before proceeding
+      const hasImportErrorsInLogs = logs.some(log => 
+        log.includes('Failed to resolve import') ||
+        log.includes('Could not resolve') ||
+        log.includes('Module not found') ||
+        log.includes('Cannot resolve module') ||
+        log.includes('The following dependencies are imported but could not be resolved')
+      )
+
+      if (hasImportErrorsInLogs) {
+        const errMsg = 'Vite dev server has import resolution errors'
+        logger.error(errMsg)
+        errors.push(errMsg)
+        try { 
+          logger.warn('Killing dev process due to import errors in logs')
+          devProcess.kill() } 
+        catch {
+          logger.warn('Failed to kill dev process')
+        }
+        return {
+          success: false,
+          logs,
+          errors,
+        }
       }
 
       // Post-start validation: ensure the app serves a valid entry without 500s
       const validateStart = Date.now()
       const validateTimeoutMs = 30000
       let validated = false
+      let hasImportErrors = false
+      
       while (!validated && (Date.now() - validateStart) < validateTimeoutMs) {
         try {
           const res = await fetch(url + '/', { signal: AbortSignal.timeout(1500) })
@@ -179,6 +276,16 @@ export async function serveApp(sandboxPath: string, jobId: string): Promise<Serv
               try {
                 const scriptRes = await fetch(url + scriptSrc, { signal: AbortSignal.timeout(1500) })
                 if (scriptRes.ok) {
+                  const scriptContent = await scriptRes.text()
+                  // Check for import resolution errors in the script content
+                  if (scriptContent.includes('Failed to resolve import') || 
+                      scriptContent.includes('Could not resolve') ||
+                      scriptContent.includes('Module not found') ||
+                      scriptContent.includes('Cannot resolve module')) {
+                    logs.push(`[CHECK] Import errors detected in ${scriptSrc}`)
+                    hasImportErrors = true
+                    break
+                  }
                   validated = true
                   break
                 } else {
@@ -192,6 +299,16 @@ export async function serveApp(sandboxPath: string, jobId: string): Promise<Serv
               try {
                 const fallbackRes = await fetch(url + '/src/main.tsx', { signal: AbortSignal.timeout(1500) })
                 if (fallbackRes.ok) {
+                  const scriptContent = await fallbackRes.text()
+                  // Check for import resolution errors in the script content
+                  if (scriptContent.includes('Failed to resolve import') || 
+                      scriptContent.includes('Could not resolve') ||
+                      scriptContent.includes('Module not found') ||
+                      scriptContent.includes('Cannot resolve module')) {
+                    logs.push(`[CHECK] Import errors detected in /src/main.tsx`)
+                    hasImportErrors = true
+                    break
+                  }
                   validated = true
                   break
                 } else {
@@ -208,8 +325,47 @@ export async function serveApp(sandboxPath: string, jobId: string): Promise<Serv
         if (!validated) await new Promise(r => setTimeout(r, 500))
       }
 
+      // Check for Vite import errors in the logs
+      const recentLogs = logs.slice(-20) // Check last 20 log entries
+      const hasViteImportErrors = recentLogs.some(log => 
+        log.includes('Failed to resolve import') ||
+        log.includes('Could not resolve') ||
+        log.includes('Module not found') ||
+        log.includes('Cannot resolve module') ||
+        log.includes('The following dependencies are imported but could not be resolved')
+      )
+
+      if (hasImportErrors || hasViteImportErrors) {
+        const errMsg = 'Validation failed: Vite import resolution errors detected'
+        logger.error(errMsg)
+        errors.push(errMsg)
+        try { 
+          logger.warn('Killing dev process due to import errors')
+          devProcess.kill() } 
+        catch {
+          logger.warn('Failed to kill dev process')
+        }
+        return {
+          success: false,
+          logs,
+          errors,
+        }
+      }
+
       if (!validated) {
-        const errMsg = 'Validation failed: main entry not served (e.g., / and module script did not return 2xx)'
+        // Check if this might be a dependency issue
+        const hasDependencyErrors = logs.some(log => 
+          log.includes('Failed to resolve dependency') ||
+          log.includes('Could not resolve') ||
+          log.includes('Module not found') ||
+          log.includes('Cannot resolve module')
+        )
+        
+        let errMsg = 'Validation failed: main entry not served (e.g., / and module script did not return 2xx)'
+        if (hasDependencyErrors) {
+          errMsg = 'Validation failed: Vite server cannot resolve dependencies (check package.json for missing dependencies)'
+        }
+        
         logger.error(errMsg)
         errors.push(errMsg)
         try { 

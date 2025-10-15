@@ -6,6 +6,10 @@ import { logger, config, type LLMMessage } from '../shared'
 import { chromium } from 'playwright'
 import { join } from 'path'
 import { mkdir } from 'fs/promises'
+import { exec } from 'child_process'
+import { promisify } from 'util'
+
+const execAsync = promisify(exec)
 
 export interface InteractionStep {
   type: 'type' | 'click' | 'wait' | 'scroll' | 'select' | 'keyboard'
@@ -108,7 +112,12 @@ export async function testAppWithInteraction(
     await browser.close()
     
     logger.success(`🎥 Video recorded: ${videoPath}`)
-    return videoPath
+
+    // Convert to mp4
+    const mp4Path = videoPath.replace('.webm', '.mp4')
+    await convertToMp4(videoPath, mp4Path)
+
+    return mp4Path
   } catch (error) {
     logger.error('App interaction error:', error)
     
@@ -221,11 +230,8 @@ async function generateTestFromRequest(userRequest: string, appContext: string, 
       const truncatedCode = appCode.length > 2000 ? appCode.substring(0, 2000) + '...' : appCode
       analysisContext += `App Code (truncated): ${truncatedCode}\n`
     }
-    
-    const prompt = [
-      {
-        role: 'system',
-        content: `You are an expert at analyzing web applications and generating automated test steps. 
+
+    const systemPrompt = `You are an expert at analyzing web applications and generating automated test steps. 
 
 Given an app context, user request, and optionally a screenshot/code, generate a JSON test plan that will interact with the app and demonstrate its functionality.
 
@@ -260,7 +266,12 @@ For selectors, use:
 - Generic selectors like "input[type='number']:first-of-type"
 - Multiple fallback selectors separated by commas
 
-Make the test realistic and demonstrate the app's main functionality based on the user's request.`
+Make the test realistic and demonstrate the app's main functionality based on the user's request.`;
+    
+    const prompt = [
+      {
+        role: 'system',
+        content: systemPrompt
       },
       {
         role: 'user',
@@ -315,6 +326,17 @@ Make the test realistic and demonstrate the app's main functionality based on th
   } catch (error) {
     logger.error('Failed to generate test from LLM:', error)
     return null
+  }
+}
+
+async function convertToMp4(webmPath: string, mp4Path: string): Promise<void> {
+  try {
+    // Use ffmpeg to convert WebM to MP4
+    await execAsync(`ffmpeg -i "${webmPath}" -c:v libx264 -c:a aac -y "${mp4Path}"`)
+    logger.debug(`Converted video: ${webmPath} -> ${mp4Path}`)
+  } catch (error) {
+    logger.warn(`Failed to convert video to MP4: ${error}`)
+    // If conversion fails, we'll still return the original WebM path
   }
 }
 

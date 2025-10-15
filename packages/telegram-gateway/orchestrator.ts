@@ -66,7 +66,7 @@ export async function orchestrate(options: OrchestrateOptions): Promise<void> {
     logger.info('🧠 Routing request...')
     const result = await routeRequest({
       text: inputText,
-      userId: chatId,
+      userId: typeof chatId === 'number' ? chatId : parseInt(chatId) || 0,
       username,
       transcription: undefined, // Will be set by router if voice message
       voiceBuffer
