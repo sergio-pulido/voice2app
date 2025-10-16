@@ -103,27 +103,10 @@ export class FriendAdapter implements Adapter {
    * Generate a geeky, tech-savvy Barna Hacker response
    */
   private async generateBarnaHackerResponse(message: string, username: string): Promise<string> {
-    const apiKey = config.groqApiKey || config.openaiApiKey
-    const isGroq = !!config.groqApiKey
+    const { createLLMProvider } = await import('../../codegen/providers')
+    const llm = createLLMProvider()
     
-    if (!apiKey) {
-      throw new Error('No LLM API key configured (GROQ_API_KEY or OPENAI_API_KEY)')
-    }
-    
-    const url = isGroq 
-      ? 'https://api.groq.com/openai/v1/chat/completions'
-      : 'https://api.openai.com/v1/chat/completions'
-    
-    const model = isGroq ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini'
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model,
+    const response = await llm.complete({
         messages: [
           {
             role: 'system',
@@ -183,17 +166,10 @@ Remember: You're a Barcelona hacker, not a customer service bot. Be real, be gee
           }
         ],
         temperature: 0.9, // Higher temperature for more creative, natural responses
-        max_tokens: 300
+        maxTokens: 300
       })
-    })
-    
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`LLM API error: ${response.status} - ${errorText}`)
-    }
-    
-    const data: any = await response.json()
-    const content = data.choices[0]?.message?.content || 'Ey colega! Ready to hack something? 🤖💻'
+
+    const content = response.content || 'Ey colega! Ready to hack something? 🤖💻'
     
     logger.success('Barna Hacker response generated')
     

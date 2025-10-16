@@ -19,25 +19,40 @@ export async function testApp(task: Task, url: string, sandboxPath: string): Pro
 
   // 1) Fetch root and ensure 2xx
   try {
-    const res = await fetch(url + '/', { signal: AbortSignal.timeout(3000) })
+    const res = await fetch(url + '/', { signal: AbortSignal.timeout(5000) })
     logs.push(`[TEST] GET / -> ${res.status}`)
     if (!res.ok) {
       errors.push('Root path did not return 2xx')
       return { success: false, logs, errors }
     }
     const html = await res.text()
-    // 2) Extract module script and fetch
-    const m = html.match(/<script[^>]*type="module"[^>]*src="([^"]+)"/i)
-    const scriptSrc = m?.[1]
-    if (!scriptSrc) {
-      errors.push('No module script found in index.html')
-      return { success: false, logs, errors }
-    }
-    const scriptRes = await fetch(url + scriptSrc, { signal: AbortSignal.timeout(3000) })
-    logs.push(`[TEST] GET ${scriptSrc} -> ${scriptRes.status}`)
-    if (!scriptRes.ok) {
-      errors.push(`Module script ${scriptSrc} did not return 2xx`)
-      return { success: false, logs, errors }
+    
+    // 2) Check if this is a Next.js app (server-side rendered)
+    const isNextApp = html.includes('__NEXT_DATA__') || html.includes('_next/static')
+    
+    if (isNextApp) {
+      // For Next.js apps, just check that the page loads and contains expected content
+      if (html.includes('<html') && html.includes('<body')) {
+        logs.push('[TEST] Next.js app detected - page structure looks good')
+        return { success: true, logs, errors }
+      } else {
+        errors.push('Next.js app did not return proper HTML structure')
+        return { success: false, logs, errors }
+      }
+    } else {
+      // For Vite/static apps, check for module scripts
+      const m = html.match(/<script[^>]*type="module"[^>]*src="([^"]+)"/i)
+      const scriptSrc = m?.[1]
+      if (!scriptSrc) {
+        errors.push('No module script found in index.html')
+        return { success: false, logs, errors }
+      }
+      const scriptRes = await fetch(url + scriptSrc, { signal: AbortSignal.timeout(3000) })
+      logs.push(`[TEST] GET ${scriptSrc} -> ${scriptRes.status}`)
+      if (!scriptRes.ok) {
+        errors.push(`Module script ${scriptSrc} did not return 2xx`)
+        return { success: false, logs, errors }
+      }
     }
   } catch (e: any) {
     const msg = e?.message || 'Unknown fetch error'

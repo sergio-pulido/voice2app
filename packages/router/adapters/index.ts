@@ -12,4 +12,5 @@ export { helpAdapter } from './help-adapter'
 export { friendAdapter } from './friend-adapter'
 export { projectManagerAdapter } from './project-manager-adapter'
 export { appAnalyzerAdapter } from './app-analyzer-adapter'
+export { promptEnhancerAdapter } from './prompt-enhancer-adapter'
 

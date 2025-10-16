@@ -1,0 +1,89 @@
+{
+  "templates": [
+    {
+      "name": "nextjs-basic-ui",
+      "path": "nextjs-basic-ui",
+      "description": "Next.js application with basic UI components and API routes",
+      "metadata": {
+        "domain": "fullstack",
+        "technologies": ["Next.js", "React", "TypeScript", "TailwindCSS"],
+        "complexity": "medium",
+        "category": "website",
+        "features": ["SSR", "API routes", "responsive UI", "TypeScript"],
+        "platform": "web",
+        "framework": "Next.js",
+        "language": "TypeScript"
+      },
+      "keywords": ["nextjs", "next.js", "react", "typescript", "ssr", "api routes", "website", "web app"],
+      "confidence_threshold": 0.2
+    },
+    {
+      "name": "vanilla-ts-canvas-app",
+      "path": "vanilla-ts-canvas-app",
+      "description": "Vanilla TypeScript application with HTML5 Canvas for interactive graphics",
+      "metadata": {
+        "domain": "frontend",
+        "technologies": ["TypeScript", "HTML5", "Canvas", "Vite"],
+        "complexity": "medium",
+        "category": "app",
+        "features": ["Canvas graphics", "interactive UI", "TypeScript", "Vite"],
+        "platform": "web",
+        "framework": "Vite",
+        "language": "TypeScript"
+      },
+      "keywords": ["canvas", "typescript", "vanilla", "interactive", "graphics", "vite"],
+      "confidence_threshold": 0.1
+    },
+    {
+      "name": "vanilla-ts-canvas-game",
+      "path": "vanilla-ts-canvas-game",
+      "description": "Vanilla TypeScript game with HTML5 Canvas, game engine, and game mechanics",
+      "metadata": {
+        "domain": "frontend",
+        "technologies": ["TypeScript", "HTML5", "Canvas", "Vite", "Game Engine"],
+        "complexity": "complex",
+        "category": "game",
+        "features": ["Game engine", "Canvas graphics", "game mechanics", "TypeScript", "Vite"],
+        "platform": "web",
+        "framework": "Vite",
+        "language": "TypeScript"
+      },
+      "keywords": ["game", "canvas", "typescript", "game engine", "vanilla", "vite"],
+      "confidence_threshold": 0.3
+    },
+    {
+      "name": "vite-react-canvas-app",
+      "path": "vite-react-canvas-app",
+      "description": "React application with HTML5 Canvas using Vite for interactive graphics",
+      "metadata": {
+        "domain": "frontend",
+        "technologies": ["React", "TypeScript", "HTML5", "Canvas", "Vite"],
+        "complexity": "medium",
+        "category": "app",
+        "features": ["React", "Canvas graphics", "interactive UI", "TypeScript", "Vite"],
+        "platform": "web",
+        "framework": "React + Vite",
+        "language": "TypeScript"
+      },
+      "keywords": ["react", "canvas", "typescript", "interactive", "graphics", "vite"],
+      "confidence_threshold": 0.2
+    },
+    {
+      "name": "vite-react-canvas-game",
+      "path": "vite-react-canvas-game",
+      "description": "React game with HTML5 Canvas, game engine, and React components",
+      "metadata": {
+        "domain": "frontend",
+        "technologies": ["React", "TypeScript", "HTML5", "Canvas", "Vite", "Game Engine"],
+        "complexity": "complex",
+        "category": "game",
+        "features": ["React", "Game engine", "Canvas graphics", "game mechanics", "TypeScript", "Vite"],
+        "platform": "web",
+        "framework": "React + Vite",
+        "language": "TypeScript"
+      },
+      "keywords": ["react", "game", "canvas", "typescript", "game engine", "vite"],
+      "confidence_threshold": 0.3
+    }
+  ]
+}

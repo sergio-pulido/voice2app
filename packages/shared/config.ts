@@ -9,6 +9,7 @@ export const config = {
   openaiApiKey: process.env.OPENAI_API_KEY || '',
   anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
   groqApiKey: process.env.GROQ_API_KEY || '',
+  deepseekApiKey: process.env.DEEPSEEK_API_KEY || '',
   elevenlabsApiKey: process.env.ELEVENLABS_API_KEY || '',
   linkupApiKey: process.env.LINKUP_API_KEY || '',
   huggingfaceApiKey: process.env.HUGGINGFACE_API_KEY || '',
@@ -42,8 +43,8 @@ export const config = {
   discordPublicKey: process.env.DISCORD_PUBLIC_KEY || '',
   
   // Provider Selection
+  llmProvider: (process.env.LLM_PROVIDER || 'deepseek') as LLMProvider,
   sttProvider: (process.env.STT_PROVIDER || 'openai') as STTProvider,
-  llmProvider: (process.env.LLM_PROVIDER || 'openai') as LLMProvider,
   ttsProvider: (process.env.TTS_PROVIDER || 'openai') as TTSProvider,
   imageProvider: (process.env.IMAGE_PROVIDER || 'huggingface') as ImageProvider,
   
@@ -77,7 +78,8 @@ export function validateConfig(): boolean {
   const llmValid =
     (config.llmProvider === 'openai' && config.openaiApiKey) ||
     (config.llmProvider === 'anthropic' && config.anthropicApiKey) ||
-    (config.llmProvider === 'groq' && config.groqApiKey)
+    (config.llmProvider === 'groq' && config.groqApiKey) ||
+    (config.llmProvider === 'deepseek' && config.deepseekApiKey)
   
   if (!config.telegramBotToken) {
     console.error('❌ Missing required: TELEGRAM_BOT_TOKEN')

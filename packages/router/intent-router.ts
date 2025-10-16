@@ -4,12 +4,24 @@
 
 import { logger } from '../shared'
 
-export type IntentCategory = 'qa' | 'app_code' | 'app_interaction' | 'image_gen' | 'video_gen' | 'translate' | 'help' | 'friend' | 'project_manager' | 'app_analyzer'
+export type IntentCategory = 'qa' | 'app_code' | 'app_interaction' | 'image_gen' | 'video_gen' | 'translate' | 'help' | 'friend' | 'project_manager' | 'app_analyzer' | 'prompt_enhancer'
 
 export interface IntentResult {
   category: IntentCategory
   confidence: number
   reasoning?: string
+  appDetails?: AppBuildDetails
+}
+
+export interface AppBuildDetails {
+  domain: 'frontend' | 'backend' | 'fullstack' | 'console' | 'server' | 'mobile' | 'desktop'
+  technologies: string[]
+  complexity: 'simple' | 'medium' | 'complex' | 'super-complex'
+  category: 'app' | 'game' | 'website' | 'landing' | 'email' | 'api' | 'cli' | 'dashboard'
+  features: string[]
+  platform: 'web' | 'mobile' | 'desktop' | 'terminal' | 'server'
+  framework?: string
+  language?: string
 }
 
 interface RouterInput {
@@ -93,7 +105,16 @@ async function llmClassify(text: string): Promise<IntentResult> {
     }
   }
   
-  // PRIORITY 5: Greetings/casual (only if NO command detected)
+  // PRIORITY 5: Prompt enhancement
+  if (/\b(enhance|improve|better|analyze|review|evaluate)\b/i.test(lowerText) && /\b(prompt|prompts)\b/i.test(lowerText)) {
+    return {
+      category: 'prompt_enhancer',
+      confidence: 0.8,
+      reasoning: 'Prompt enhancement request detected (fallback)'
+    }
+  }
+  
+  // PRIORITY 6: Greetings/casual (only if NO command detected)
   if (/\b(hello|hi|hey|hola|good morning|buenos días|how are you|cómo estás)\b/i.test(lowerText)) {
     return {
       category: 'friend',
@@ -102,7 +123,7 @@ async function llmClassify(text: string): Promise<IntentResult> {
     }
   }
   
-  // PRIORITY 6: Default to Q&A for questions
+  // PRIORITY 7: Default to Q&A for questions
   return {
     category: 'qa',
     confidence: 0.6,
@@ -224,6 +245,12 @@ async function openaiClassify(text: string): Promise<IntentResult> {
    ✅ "Search for calculator", "Find my snake game", "Show project 2", "My project history"
    ❌ NOT for creating new projects (that's app_code)
 
+**"prompt_enhancer"** - Enhancing, improving, or analyzing prompts for better AI interactions
+   🎯 Keywords: enhance, improve, better, analyze, review, evaluate + prompt
+   ✅ "Enhance this prompt: Create a calculator", "Improve: Build a web app", "Make this better: Write a function"
+   ✅ "Analyze this prompt: Generate an image", "Review my prompt", "Help me improve my prompts"
+   ✅ "Show prompt examples", "Better prompt for AI/ML", "How to write better prompts"
+
 🚨 DISAMBIGUATION RULES:
 - "Generate/Create/Make/Build + [something]" → ALWAYS a command (image_gen/video_gen/app_code), NEVER friend
 - "Generate/Create/Make/Build + game/snake/calculator/app" → ALWAYS app_code
@@ -239,7 +266,7 @@ async function openaiClassify(text: string): Promise<IntentResult> {
 - "What is X?" → qa (factual question)
 - "How do I create X?" → probably app_code if about building something
 
-Respond with ONLY ONE WORD: image_gen, video_gen, app_code, app_interaction, translate, help, qa, or friend
+Respond with ONLY ONE WORD: image_gen, video_gen, app_code, app_interaction, translate, help, qa, friend, project_manager, app_analyzer, or prompt_enhancer
 
 When in doubt between friend and a command: CHOOSE THE COMMAND.`
           },
@@ -262,7 +289,7 @@ When in doubt between friend and a command: CHOOSE THE COMMAND.`
     const result = data.choices[0]?.message?.content?.trim().toLowerCase() || 'qa'
     
     // Validate the response
-    const validCategories: IntentCategory[] = ['help', 'friend', 'qa', 'app_code', 'app_interaction', 'image_gen', 'video_gen', 'translate', 'project_manager', 'app_analyzer']
+    const validCategories: IntentCategory[] = ['help', 'friend', 'qa', 'app_code', 'app_interaction', 'image_gen', 'video_gen', 'translate', 'project_manager', 'app_analyzer', 'prompt_enhancer']
     const category = validCategories.includes(result as IntentCategory) 
       ? result as IntentCategory 
       : 'qa'
@@ -383,6 +410,12 @@ async function groqClassify(text: string): Promise<IntentResult> {
    ✅ "Search for calculator", "Find my snake game", "Show project 2", "My project history"
    ❌ NOT for creating new projects (that's app_code)
 
+**"prompt_enhancer"** - Enhancing, improving, or analyzing prompts for better AI interactions
+   🎯 Keywords: enhance, improve, better, analyze, review, evaluate + prompt
+   ✅ "Enhance this prompt: Create a calculator", "Improve: Build a web app", "Make this better: Write a function"
+   ✅ "Analyze this prompt: Generate an image", "Review my prompt", "Help me improve my prompts"
+   ✅ "Show prompt examples", "Better prompt for AI/ML", "How to write better prompts"
+
 🚨 DISAMBIGUATION RULES:
 - "Generate/Create/Make/Build + [something]" → ALWAYS a command (image_gen/video_gen/app_code), NEVER friend
 - "Generate/Create/Make/Build + game/snake/calculator/app" → ALWAYS app_code
@@ -398,7 +431,7 @@ async function groqClassify(text: string): Promise<IntentResult> {
 - "What is X?" → qa (factual question)
 - "How do I create X?" → probably app_code if about building something
 
-Respond with ONLY ONE WORD: image_gen, video_gen, app_code, app_interaction, translate, help, qa, or friend
+Respond with ONLY ONE WORD: image_gen, video_gen, app_code, app_interaction, translate, help, qa, friend, project_manager, app_analyzer, or prompt_enhancer
 
 When in doubt between friend and a command: CHOOSE THE COMMAND.`
             },
@@ -431,7 +464,7 @@ When in doubt between friend and a command: CHOOSE THE COMMAND.`
       const result = data.choices[0]?.message?.content?.trim().toLowerCase() || 'qa'
       
       // Validate the response
-      const validCategories: IntentCategory[] = ['help', 'friend', 'qa', 'app_code', 'app_interaction', 'image_gen', 'video_gen', 'translate', 'project_manager', 'app_analyzer']
+      const validCategories: IntentCategory[] = ['help', 'friend', 'qa', 'app_code', 'app_interaction', 'image_gen', 'video_gen', 'translate', 'project_manager', 'app_analyzer', 'prompt_enhancer']
       const category = validCategories.includes(result as IntentCategory) 
         ? result as IntentCategory 
         : 'qa'
@@ -470,6 +503,82 @@ When in doubt between friend and a command: CHOOSE THE COMMAND.`
 /**
  * Main intent detection function
  */
+/**
+ * Use LLM provider to intelligently classify the request
+ */
+async function llmClassifyIntent(text: string): Promise<IntentResult> {
+  try {
+    const { createLLMProvider } = await import('../codegen/providers')
+    const llm = createLLMProvider()
+    
+    const response = await llm.complete({
+      messages: [
+        {
+          role: 'system',
+          content: `You are an expert intent classifier for an AI-first voice application. Analyze the user's request and classify it into ONE category.
+
+🎤 IMPORTANT: Input may be TRANSCRIBED VOICE - handle natural speech patterns, filler words, and slight transcription errors.
+🌍 MULTILINGUAL: Input can be in ANY language (English, Spanish, Catalan, French, etc.) - understand the intent regardless of language.
+
+⚠️ CRITICAL PRIORITY ORDER:
+1. COMMANDS (image_gen, video_gen, app_code, translate) - If user wants to CREATE/GENERATE/BUILD/MAKE something, this ALWAYS takes priority!
+2. INTERACTIONS (app_interaction) - If user wants to TEST/INTERACT with an existing app
+3. GENERAL (qa) - Everything else
+
+📋 VALID CATEGORIES:
+- app_code: User wants to CREATE/BUILD/MAKE/GENERATE an app, game, website, or software
+- image_gen: User wants to CREATE/GENERATE/DRAW an image, picture, or visual content
+- video_gen: User wants to CREATE/GENERATE/MAKE a video or animation
+- translate: User wants to TRANSLATE text from one language to another
+- app_interaction: User wants to TEST/INTERACT/PLAY with an existing app or game
+- prompt_enhancer: User wants to IMPROVE/ENHANCE/OPTIMIZE a prompt for better results
+- qa: General questions, explanations, or non-action requests
+
+🎯 EXAMPLES:
+- "Create a calculator app" → app_code
+- "Make a Mario game" → app_code  
+- "Generate an image of a cat" → image_gen
+- "Draw a sunset landscape" → image_gen
+- "Create a video of dancing" → video_gen
+- "Make an animation" → video_gen
+- "Translate hello to Spanish" → translate
+- "Test the game" → app_interaction
+- "Play the app" → app_interaction
+- "Improve this prompt" → prompt_enhancer
+- "What is React?" → qa
+- "How does this work?" → qa
+
+Return ONLY the category name, nothing else.`
+        },
+        {
+          role: 'user',
+          content: text
+        }
+      ],
+      temperature: 0.1,
+      maxTokens: 10
+    })
+    
+    const category = response.content.trim().toLowerCase()
+    
+    // Validate category
+    const validCategories = ['app_code', 'image_gen', 'video_gen', 'translate', 'app_interaction', 'prompt_enhancer', 'qa']
+    if (!validCategories.includes(category)) {
+      logger.warn(`Invalid category from LLM: ${category}, using fallback`)
+      return llmClassify(text)
+    }
+    
+    return {
+      category: category as IntentCategory,
+      confidence: 0.95,
+      reasoning: 'LLM classification'
+    }
+  } catch (error: any) {
+    logger.warn('LLM classification error, using fallback:', error)
+    return llmClassify(text)
+  }
+}
+
 export async function detectIntent(input: RouterInput): Promise<IntentResult> {
   const textToLog = typeof input.text === 'string' ? input.text.substring(0, 100) : String(input.text).substring(0, 100)
   logger.info(`🧠 Intent Router received: "${textToLog}${input.text.length > 100 ? '...' : ''}"`)
@@ -491,13 +600,159 @@ export async function detectIntent(input: RouterInput): Promise<IntentResult> {
   const cleanedText = validation.cleaned
   logger.info(`✅ Cleaned text for Groq: "${cleanedText.substring(0, 100)}${cleanedText.length > 100 ? '...' : ''}"`)
   
-  // Step 2: Use Groq for intelligent classification
-  logger.info('🤖 Sending to Groq LLM for intent classification...')
-  const groqResult = await groqClassify(cleanedText)
+  // Step 2: Use LLM provider for intelligent classification
+  logger.info('🤖 Sending to LLM for intent classification...')
+  const groqResult = await llmClassifyIntent(cleanedText)
+  
+  // Step 3: If it's an app_code request, extract detailed app information
+  if (groqResult.category === 'app_code') {
+    logger.info('🔍 Extracting app build details...')
+    const appDetails = await extractAppDetails(cleanedText)
+    groqResult.appDetails = appDetails
+    logger.success(`📋 App details extracted: ${appDetails.category} ${appDetails.complexity} app using ${appDetails.technologies.join(', ')}`)
+  }
   
   logger.success(`🎯 Groq result: ${groqResult.category} (${groqResult.confidence} confidence) - ${groqResult.reasoning}`)
   
   return groqResult
+}
+
+/**
+ * Extract detailed app information using LLM
+ */
+async function extractAppDetails(text: string): Promise<AppBuildDetails> {
+  try {
+    const { createLLMProvider } = await import('../codegen/providers')
+    const llm = createLLMProvider()
+    
+    const response = await llm.complete({
+        messages: [
+          {
+            role: 'system',
+            content: `You are an expert software architect. Analyze the user's request and extract structured information about what they want to build.
+
+Return ONLY a JSON object with this exact structure:
+{
+  "domain": "frontend|backend|fullstack|console|server|mobile|desktop",
+  "technologies": ["list", "of", "technologies"],
+  "complexity": "simple|medium|complex|super-complex",
+  "category": "app|game|website|landing|email|api|cli|dashboard",
+  "features": ["list", "of", "key", "features"],
+  "platform": "web|mobile|desktop|terminal|server",
+  "framework": "specific framework if mentioned",
+  "language": "primary programming language"
+}
+
+Guidelines:
+- Domain: What type of development (frontend for UI, backend for APIs, fullstack for both, etc.)
+- Technologies: Include all mentioned tech (React, Next.js, Python, etc.)
+- Complexity: Assess based on features, integrations, and scope
+- Category: What type of application
+- Features: Key functionality mentioned
+- Platform: Target platform
+- Framework: Specific framework if mentioned
+- Language: Primary programming language
+
+Examples:
+"Create a simple calculator" → {"domain": "frontend", "technologies": ["HTML", "CSS", "JavaScript"], "complexity": "simple", "category": "app", "features": ["calculation", "basic UI"], "platform": "web", "framework": null, "language": "JavaScript"}
+
+"Build a Next.js e-commerce site with payments" → {"domain": "fullstack", "technologies": ["Next.js", "React", "Node.js", "Stripe"], "complexity": "complex", "category": "website", "features": ["e-commerce", "payments", "user auth"], "platform": "web", "framework": "Next.js", "language": "JavaScript"}`
+          },
+          {
+            role: 'user',
+            content: text
+          }
+        ],
+        temperature: 0.1,
+        maxTokens: 500
+      })
+
+    const content = response.content.trim()
+    
+    // Parse JSON response
+    let cleanContent = content
+    if (cleanContent.startsWith('```json')) {
+      cleanContent = cleanContent.replace(/^```json\s*/, '').replace(/\s*```$/, '')
+    } else if (cleanContent.startsWith('```')) {
+      cleanContent = cleanContent.replace(/^```\s*/, '').replace(/\s*```$/, '')
+    }
+
+    const jsonMatch = cleanContent.match(/\{[\s\S]*\}/)
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0])
+      return {
+        domain: parsed.domain || 'frontend',
+        technologies: Array.isArray(parsed.technologies) ? parsed.technologies : [],
+        complexity: parsed.complexity || 'medium',
+        category: parsed.category || 'app',
+        features: Array.isArray(parsed.features) ? parsed.features : [],
+        platform: parsed.platform || 'web',
+        framework: parsed.framework || undefined,
+        language: parsed.language || undefined
+      }
+    }
+  } catch (error) {
+    logger.error('App details extraction error:', error)
+  }
+
+  return getFallbackAppDetails(text)
+}
+
+/**
+ * Fallback app details when LLM extraction fails
+ */
+function getFallbackAppDetails(text: string): AppBuildDetails {
+  const lowerText = text.toLowerCase()
+  
+  // Simple heuristics for fallback
+  let domain: AppBuildDetails['domain'] = 'frontend'
+  let category: AppBuildDetails['category'] = 'app'
+  let technologies: string[] = []
+  let complexity: AppBuildDetails['complexity'] = 'medium'
+  let platform: AppBuildDetails['platform'] = 'web'
+
+  // Detect domain
+  if (lowerText.includes('api') || lowerText.includes('backend') || lowerText.includes('server')) {
+    domain = 'backend'
+  } else if (lowerText.includes('fullstack') || lowerText.includes('full-stack')) {
+    domain = 'fullstack'
+  }
+
+  // Detect category
+  if (lowerText.includes('game')) {
+    category = 'game'
+  } else if (lowerText.includes('website') || lowerText.includes('landing')) {
+    category = 'website'
+  } else if (lowerText.includes('email')) {
+    category = 'email'
+  } else if (lowerText.includes('dashboard')) {
+    category = 'dashboard'
+  }
+
+  // Detect technologies
+  if (lowerText.includes('next.js') || lowerText.includes('nextjs')) technologies.push('Next.js')
+  if (lowerText.includes('react')) technologies.push('React')
+  if (lowerText.includes('vue')) technologies.push('Vue.js')
+  if (lowerText.includes('angular')) technologies.push('Angular')
+  if (lowerText.includes('python')) technologies.push('Python')
+  if (lowerText.includes('django')) technologies.push('Django')
+  if (lowerText.includes('node')) technologies.push('Node.js')
+
+  // Detect complexity
+  if (lowerText.includes('simple') || lowerText.includes('basic')) {
+    complexity = 'simple'
+  } else if (lowerText.includes('complex') || lowerText.includes('advanced') || lowerText.includes('enterprise')) {
+    complexity = 'complex'
+  }
+
+  return {
+    domain,
+    technologies,
+    complexity,
+    category,
+    features: [],
+    platform
+  }
 }
 
 /**
@@ -514,7 +769,8 @@ export function getCategoryName(category: IntentCategory): string {
     'video_gen': '🎬',
     'translate': '🌐',
     'project_manager': '📁',
-    'app_analyzer': '🔍'
+    'app_analyzer': '🔍',
+    'prompt_enhancer': '🔧'
   }
   return names[category]
 }
@@ -533,7 +789,8 @@ export function getCategoryEmoji(category: IntentCategory): string {
     'video_gen': '🎬',
     'translate': '🌐',
     'project_manager': '📁',
-    'app_analyzer': '🔍'
+    'app_analyzer': '🔍',
+    'prompt_enhancer': '🔧'
   }
   return emojis[category]
 }

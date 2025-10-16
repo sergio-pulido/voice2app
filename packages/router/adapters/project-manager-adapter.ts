@@ -145,7 +145,7 @@ export class ProjectManagerAdapter {
     
     if (projects.length === 0) {
       return {
-        summaryText: "📁 **Your Projects**\n\nYou haven't created any projects yet! Generate your first app to get started. 🚀",
+        summaryText: "**Your Projects**\n\nYou haven't created any projects yet! Generate your first app to get started. 🚀",
         metadata: {
           category: 'project_manager',
           status: 'success'
@@ -164,7 +164,7 @@ export class ProjectManagerAdapter {
     
     logger.debug(`Project list: limit=${limit}, pageSize=${pageSize}, total=${projects.length}, showing=${displayProjects.length}`)
     
-    let message = `📁 **Your Projects** (${projects.length} total)\n\n`
+    let message = `**Your Projects** (${projects.length} total)\n\n`
     
     // Use the shared formatting function
     message += this.formatProjectsList(displayProjects)
@@ -198,7 +198,7 @@ export class ProjectManagerAdapter {
     
     if (projects.length === 0) {
       return {
-        summaryText: "📁 **Your Projects**\n\nYou haven't created any projects yet! Generate your first app to get started. 🚀",
+        summaryText: "**Your Projects**\n\nYou haven't created any projects yet! Generate your first app to get started. 🚀",
         metadata: {
           category: 'project_manager',
           status: 'success'

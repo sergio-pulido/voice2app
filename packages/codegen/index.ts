@@ -7,12 +7,12 @@ import { generateCode } from './generator'
 import { writeFiles } from './file-writer'
 import { join } from 'path'
 
-export async function generateApp(task: Task): Promise<CodegenResult> {
+export async function generateApp(task: Task, appDetails?: any): Promise<CodegenResult> {
   logger.job(task.jobId, 'Starting code generation...')
   
   try {
     // Generate code based on task
-    const files = await generateCode(task)
+    const files = await generateCode(task, appDetails)
     
     if (files.length === 0) {
       throw new Error('No files generated')

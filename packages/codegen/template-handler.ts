@@ -3,6 +3,7 @@
  */
 
 import { type Task, type GeneratedFile, logger } from '../shared'
+import { createLLMProvider } from './providers'
 import {
   FALLBACK_APP_HTML,
   EMAIL_TEMPLATE_HTML,
@@ -11,6 +12,8 @@ import {
   LOADING_PAGE_HTML,
   HELLO_WORLD_HTML
 } from '../shared/snippets'
+import { readFile } from 'fs/promises'
+import { join } from 'path'
 
 interface TemplateConfig {
   name: string
@@ -18,6 +21,37 @@ interface TemplateConfig {
   snippet: string
   placeholders: string[]
   description: string
+}
+
+interface TemplateMetadata {
+  domain: 'frontend' | 'backend' | 'fullstack' | 'console' | 'server' | 'mobile' | 'desktop'
+  technologies: string[]
+  complexity: 'simple' | 'medium' | 'complex' | 'super-complex'
+  category: 'app' | 'game' | 'website' | 'landing' | 'email' | 'api' | 'cli' | 'dashboard'
+  features: string[]
+  platform: 'web' | 'mobile' | 'desktop' | 'terminal' | 'server'
+  framework?: string
+  language?: string
+}
+
+interface StructuredTemplate {
+  name: string
+  path: string
+  description: string
+  metadata: TemplateMetadata
+  keywords: string[]
+  confidence_threshold: number
+}
+
+interface AppBuildDetails {
+  domain: 'frontend' | 'backend' | 'fullstack' | 'console' | 'server' | 'mobile' | 'desktop'
+  technologies: string[]
+  complexity: 'simple' | 'medium' | 'complex' | 'super-complex'
+  category: 'app' | 'game' | 'website' | 'landing' | 'email' | 'api' | 'cli' | 'dashboard'
+  features: string[]
+  platform: 'web' | 'mobile' | 'desktop' | 'terminal' | 'server'
+  framework?: string
+  language?: string
 }
 
 const AVAILABLE_TEMPLATES: TemplateConfig[] = [
@@ -89,14 +123,142 @@ const AVAILABLE_TEMPLATES: TemplateConfig[] = [
 ]
 
 /**
- * Detect if a task matches a template
+ * Load structured templates from metadata file
  */
-export function detectTemplate(task: Task): TemplateConfig | null {
+async function loadStructuredTemplates(): Promise<StructuredTemplate[]> {
+  try {
+    const metadataPath = join(process.cwd(), 'packages', 'shared', 'templates', 'template-metadata.json')
+    const metadataContent = await readFile(metadataPath, 'utf-8')
+    const metadata = JSON.parse(metadataContent)
+    return metadata.templates
+  } catch (error) {
+    logger.error('Failed to load template metadata:', error)
+    return []
+  }
+}
+
+/**
+ * Calculate match score between app details and template metadata
+ */
+function calculateMatchScore(appDetails: AppBuildDetails, template: StructuredTemplate): number {
+  let score = 0
+  let totalChecks = 0
+
+  // Domain match (weight: 3)
+  totalChecks += 3
+  if (appDetails.domain === template.metadata.domain) {
+    score += 3
+  }
+
+  // Category match (weight: 3)
+  totalChecks += 3
+  if (appDetails.category === template.metadata.category) {
+    score += 3
+  }
+
+  // Technology match (weight: 2)
+  totalChecks += 2
+  const techMatches = appDetails.technologies.filter(tech => 
+    template.metadata.technologies.some(templateTech => 
+      templateTech.toLowerCase().includes(tech.toLowerCase()) || 
+      tech.toLowerCase().includes(templateTech.toLowerCase())
+    )
+  ).length
+  if (techMatches > 0) {
+    score += Math.min(2, (techMatches / Math.max(appDetails.technologies.length, template.metadata.technologies.length)) * 2)
+  }
+
+  // Complexity match (weight: 2)
+  totalChecks += 2
+  if (appDetails.complexity === template.metadata.complexity) {
+    score += 2
+  } else if (
+    (appDetails.complexity === 'simple' && template.metadata.complexity === 'medium') ||
+    (appDetails.complexity === 'medium' && template.metadata.complexity === 'simple') ||
+    (appDetails.complexity === 'complex' && template.metadata.complexity === 'medium') ||
+    (appDetails.complexity === 'super-complex' && template.metadata.complexity === 'complex')
+  ) {
+    score += 1 // Partial match for adjacent complexity levels
+  }
+
+  // Platform match (weight: 1)
+  totalChecks += 1
+  if (appDetails.platform === template.metadata.platform) {
+    score += 1
+  }
+
+  // Framework match (weight: 2)
+  if (appDetails.framework && template.metadata.framework) {
+    totalChecks += 2
+    if (appDetails.framework.toLowerCase() === template.metadata.framework.toLowerCase()) {
+      score += 2
+    }
+  }
+
+  // Language match (weight: 1)
+  if (appDetails.language && template.metadata.language) {
+    totalChecks += 1
+    if (appDetails.language.toLowerCase() === template.metadata.language.toLowerCase()) {
+      score += 1
+    }
+  }
+
+  return totalChecks > 0 ? score / totalChecks : 0
+}
+
+/**
+ * Detect if a task matches a template using intelligent matching
+ */
+export async function detectTemplate(task: Task, appDetails?: AppBuildDetails): Promise<TemplateConfig | null> {
+  // If we have structured app details, use intelligent matching
+  if (appDetails) {
+    logger.info('🔍 App details:', appDetails)
+    logger.info('🧠 Using intelligent template matching...')
+    const structuredTemplates = await loadStructuredTemplates()
+    
+    let bestMatch: { template: StructuredTemplate; score: number } | null = null
+    
+    for (const template of structuredTemplates) {
+      const score = calculateMatchScore(appDetails, template)
+      logger.debug(`📊 Template ${template.name} score: ${score.toFixed(2)} (threshold: ${template.confidence_threshold})`)
+      
+      if (score >= template.confidence_threshold && (!bestMatch || score > bestMatch.score)) {
+        // Check if template files actually exist
+        const templatePath = join(process.cwd(), 'packages', 'shared', 'templates', template.name, 'package.json')
+        try {
+          await readFile(templatePath, 'utf-8')
+          bestMatch = { template, score }
+        } catch (error) {
+          logger.warn(`⚠️ Template ${template.name} has no files, skipping`)
+          continue
+        }
+      }
+    }
+    
+    if (bestMatch) {
+      logger.success(`✅ Best template match: ${bestMatch.template.name} (score: ${bestMatch.score.toFixed(2)})`)
+      
+      // Convert structured template to legacy format for compatibility
+      return {
+        name: bestMatch.template.name,
+        keywords: bestMatch.template.keywords,
+        snippet: '', // Will be loaded from template files
+        placeholders: [],
+        description: bestMatch.template.description
+      }
+    } else {
+      logger.info('❌ No template matches found with sufficient confidence')
+      return null
+    }
+  }
+  
+  // Fallback to primitive keyword matching for backward compatibility
+  logger.info('⚠️  Falling back to primitive keyword matching...')
   const context = task.context.toLowerCase()
   
   for (const template of AVAILABLE_TEMPLATES) {
     if (template.keywords.some(keyword => context.includes(keyword))) {
-      logger.info(`📋 Detected template: ${template.name}`)
+      logger.info(`📋 Detected template (fallback): ${template.name}`)
       return template
     }
   }
@@ -277,10 +439,15 @@ function getPlaceholderDescription(placeholder: string): string {
 /**
  * Generate files from template
  */
-export function generateFromTemplate(task: Task, template: TemplateConfig): GeneratedFile[] {
+export async function generateFromTemplate(task: Task, template: TemplateConfig): Promise<GeneratedFile[]> {
   logger.info(`🎨 Generating from template: ${template.name}`)
   
-  // Generate smart placeholders
+  // For structured templates, load the actual template files
+  if (template.name !== 'email' && template.name !== 'landing_page' && template.name !== 'error_page' && template.name !== 'loading_page' && template.name !== 'hello_world') {
+    return await generateFromStructuredTemplate(task, template)
+  }
+  
+  // Generate smart placeholders for HTML snippets
   const placeholders = generateSmartPlaceholders(task, template)
   
   // Fill template
@@ -292,13 +459,177 @@ export function generateFromTemplate(task: Task, template: TemplateConfig): Gene
   return [
     {
       path: 'index.html',
-      content: filledTemplate
+      content: filledTemplate,
+      language: 'html'
     },
     {
       path: 'README.md',
-      content: readme
+      content: readme,
+      language: 'markdown'
     }
   ]
+}
+
+/**
+ * Generate from structured template files
+ */
+async function generateFromStructuredTemplate(task: Task, template: TemplateConfig): Promise<GeneratedFile[]> {
+  try {
+    const templatePath = join(process.cwd(), 'packages', 'shared', 'templates', template.name)
+    
+    // Load all template files
+    const templateFiles = await loadTemplateFiles(template.name)
+    
+    // Ask LLM to complete the template based on the task
+    const completedFiles = await completeTemplateWithLLM(task, templateFiles, template.name)
+    
+    return completedFiles
+  } catch (error) {
+    logger.error(`Failed to generate from structured template ${template.name}:`, error)
+    return []
+  }
+}
+
+/**
+ * Load template files from directory
+ */
+async function loadTemplateFiles(templateName: string): Promise<GeneratedFile[]> {
+  const templatePath = join(process.cwd(), 'packages', 'shared', 'templates', templateName)
+  const files: GeneratedFile[] = []
+  
+  try {
+    // Read package.json first
+    const packageJsonPath = join(templatePath, 'package.json')
+    const packageJson = await readFile(packageJsonPath, 'utf-8')
+    files.push({
+      path: 'package.json',
+      content: packageJson,
+      language: 'json'
+    })
+    
+    // Read other important files
+    const filesToLoad = [
+      'index.html',
+      'vite.config.ts',
+      'tsconfig.json',
+      'tsconfig.node.json',
+      'tailwind.config.js',
+      'postcss.config.js',
+      'src/main.tsx',
+      'src/App.tsx',
+      'src/index.css',
+      'src/game/engine.ts',
+      'src/game/types.ts',
+      'src/styles.css'
+    ]
+    
+    for (const fileName of filesToLoad) {
+      try {
+        const filePath = join(templatePath, fileName)
+        const content = await readFile(filePath, 'utf-8')
+        
+        // Determine language from extension
+        let language = 'text'
+        if (fileName.endsWith('.tsx') || fileName.endsWith('.ts')) language = 'typescript'
+        else if (fileName.endsWith('.js')) language = 'javascript'
+        else if (fileName.endsWith('.json')) language = 'json'
+        else if (fileName.endsWith('.html')) language = 'html'
+        else if (fileName.endsWith('.css')) language = 'css'
+        
+        files.push({
+          path: fileName,
+          content: content,
+          language: language
+        })
+      } catch (error) {
+        // File doesn't exist, skip it
+        continue
+      }
+    }
+    
+    return files
+  } catch (error) {
+    logger.error(`Failed to load template files for ${templateName}:`, error)
+    return []
+  }
+}
+
+/**
+ * Complete template with LLM based on task requirements
+ */
+async function completeTemplateWithLLM(task: Task, templateFiles: GeneratedFile[], templateName: string): Promise<GeneratedFile[]> {
+  try {
+    const llm = createLLMProvider()
+    
+    const systemPrompt = `You are an expert game developer. You have been given a ${templateName} template and need to complete it based on the user's requirements.
+
+Template files provided:
+${templateFiles.map(f => `- ${f.path}: ${f.content.substring(0, 200)}...`).join('\n')}
+
+User requirements: ${task.context}
+
+Your task:
+1. Complete the game implementation based on the user's requirements
+2. Ensure the game has proper Mario-style mechanics (jumping, coin collection, platformer gameplay)
+3. Make it mobile-responsive with touch controls
+4. Add proper game logic, collision detection, and character movement
+5. Use the existing template structure but complete the missing game logic
+
+CRITICAL: You MUST include ALL essential files for a Vite+React project:
+- package.json (with all dependencies)
+- index.html (entry point)
+- vite.config.ts (Vite configuration)
+- tsconfig.json (TypeScript configuration)
+- src/main.tsx (React entry point)
+- src/App.tsx (main component)
+- src/index.css (global styles)
+- All game-related files (engine, types, etc.)
+
+Return ONLY a JSON array of files with this exact structure:
+[
+  {
+    "path": "filename.ext",
+    "content": "complete file content here",
+    "language": "typescript|javascript|json|html|css"
+  }
+]
+
+Include ALL necessary files to make the game work properly. Do not skip any essential files.`
+
+    const response = await llm.complete({
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `Complete the ${templateName} template for: ${task.context}` }
+      ],
+      temperature: 0.3,
+      maxTokens: 8000
+    })
+
+    // Parse LLM response
+    let cleanResponse = response.content?.trim() || ''
+    
+    // Remove markdown code blocks
+    if (cleanResponse.startsWith('```json')) {
+      cleanResponse = cleanResponse.replace(/^```json\s*/, '').replace(/\s*```$/, '')
+    } else if (cleanResponse.startsWith('```')) {
+      cleanResponse = cleanResponse.replace(/^```\s*/, '').replace(/\s*```$/, '')
+    }
+
+    // Extract JSON
+    const jsonMatch = cleanResponse.match(/\[[\s\S]*\]/)
+    if (jsonMatch) {
+      const files = JSON.parse(jsonMatch[0])
+      logger.success(`✅ LLM completed ${files.length} files for ${templateName} template`)
+      return files
+    }
+    
+    logger.warn('Failed to parse LLM response, returning template files as-is')
+    return templateFiles
+    
+  } catch (error) {
+    logger.error('LLM completion failed:', error)
+    return templateFiles
+  }
 }
 
 /**
@@ -329,15 +660,15 @@ export function getTemplateHints(task: Task): string {
 /**
  * Main template generation function
  */
-export function tryGenerateFromTemplate(task: Task): GeneratedFile[] | null {
-  const template = detectTemplate(task)
+export async function tryGenerateFromTemplate(task: Task, appDetails?: AppBuildDetails): Promise<GeneratedFile[] | null> {
+  const template = await detectTemplate(task, appDetails)
   
   if (!template) {
     return null
   }
   
   try {
-    const files = generateFromTemplate(task, template)
+    const files = await generateFromTemplate(task, template)
     logger.success(`✅ Generated ${files.length} files from ${template.name} template`)
     return files
   } catch (error) {

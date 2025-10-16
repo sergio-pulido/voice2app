@@ -151,27 +151,10 @@ export class QAAdapter implements Adapter {
    * Step 1: Ask Groq to answer and assess if it needs more information
    */
   private async assessAndAnswer(question: string): Promise<{ answer: string; needsMoreInfo: boolean }> {
-    const apiKey = config.groqApiKey || config.openaiApiKey
-    const isGroq = !!config.groqApiKey
+    const { createLLMProvider } = await import('../../codegen/providers')
+    const llm = createLLMProvider()
     
-    if (!apiKey) {
-      throw new Error('No LLM API key configured (GROQ_API_KEY or OPENAI_API_KEY)')
-    }
-    
-    const url = isGroq 
-      ? 'https://api.groq.com/openai/v1/chat/completions'
-      : 'https://api.openai.com/v1/chat/completions'
-    
-    const model = isGroq ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini'
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model,
+    const response = await llm.complete({
         messages: [
           {
             role: 'system',
@@ -206,17 +189,10 @@ Type EXACTLY: "NEEDS_SEARCH:" and nothing else. No explanation. I'll fetch web d
           }
         ],
         temperature: 0.7,
-        max_tokens: 400
+        maxTokens: 400
       })
-    })
-    
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`LLM API error: ${response.status} - ${errorText}`)
-    }
-    
-    const data: any = await response.json()
-    const content = data.choices[0]?.message?.content || 'No answer generated'
+
+    const content = response.content || 'No answer generated'
     
     // Check if Groq wants more information (check if NEEDS_SEARCH appears anywhere)
     if (content.includes('NEEDS_SEARCH:')) {
@@ -235,23 +211,10 @@ Type EXACTLY: "NEEDS_SEARCH:" and nothing else. No explanation. I'll fetch web d
    * Simple answer without web search
    */
   private async simpleAnswer(question: string): Promise<string> {
-    const apiKey = config.groqApiKey || config.openaiApiKey
-    const isGroq = !!config.groqApiKey
+    const { createLLMProvider } = await import('../../codegen/providers')
+    const llm = createLLMProvider()
     
-    const url = isGroq 
-      ? 'https://api.groq.com/openai/v1/chat/completions'
-      : 'https://api.openai.com/v1/chat/completions'
-    
-    const model = isGroq ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini'
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model,
+    const response = await llm.complete({
         messages: [
           {
             role: 'system',
@@ -263,40 +226,20 @@ Type EXACTLY: "NEEDS_SEARCH:" and nothing else. No explanation. I'll fetch web d
           }
         ],
         temperature: 0.7,
-        max_tokens: 500
+        maxTokens: 500
       })
-    })
-    
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`LLM API error: ${response.status} - ${errorText}`)
-    }
-    
-    const data: any = await response.json()
-    return data.choices[0]?.message?.content || 'No answer generated'
+
+    return response.content || 'No answer generated'
   }
   
   /**
    * Step 3: Generate detailed answer with search context (no length limit)
    */
   private async answerWithContext(question: string, searchContext: string): Promise<string> {
-    const apiKey = config.groqApiKey || config.openaiApiKey
-    const isGroq = !!config.groqApiKey
+    const { createLLMProvider } = await import('../../codegen/providers')
+    const llm = createLLMProvider()
     
-    const url = isGroq 
-      ? 'https://api.groq.com/openai/v1/chat/completions'
-      : 'https://api.openai.com/v1/chat/completions'
-    
-    const model = isGroq ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini'
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model,
+    const response = await llm.complete({
         messages: [
           {
             role: 'system',
@@ -310,17 +253,10 @@ Type EXACTLY: "NEEDS_SEARCH:" and nothing else. No explanation. I'll fetch web d
           }
         ],
         temperature: 0.7,
-        max_tokens: 1000  // Much longer for detailed answers!
+        maxTokens: 1000  // Much longer for detailed answers!
       })
-    })
-    
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`LLM API error: ${response.status} - ${errorText}`)
-    }
-    
-    const data: any = await response.json()
-    const answer = data.choices[0]?.message?.content || 'No answer generated'
+
+    const answer = response.content || 'No answer generated'
     
     logger.success('Detailed answer generated with search context')
     

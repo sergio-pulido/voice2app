@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root { --bg: #0b1020; --panel: rgba(255,255,255,0.06); --border: rgba(255,255,255,0.12); --fg: #f2f6ff; --muted: #c9d3ffb0; --accent: #93e5ff; }
 * { box-sizing: border-box; }
 html, body { height: 100%; }

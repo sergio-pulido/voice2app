@@ -58,10 +58,11 @@ export async function serveApp(sandboxPath: string, jobId: string): Promise<Serv
       }
     }
     
-    // Check for dev/start/serve script and Vite
+    // Check for dev/start/serve script and Vite/Next.js
     const packageJson = JSON.parse(await readFile(packageJsonPath, 'utf-8'))
     const devScript = packageJson.scripts?.dev || packageJson.scripts?.start || packageJson.scripts?.serve
     const isViteProject = packageJson.devDependencies?.vite || packageJson.dependencies?.vite
+    const isNextProject = packageJson.dependencies?.next || packageJson.devDependencies?.next
 
     logger.debug('Package.json analysis:', {
       hasDevScript: !!packageJson.scripts?.dev,
@@ -69,6 +70,7 @@ export async function serveApp(sandboxPath: string, jobId: string): Promise<Serv
       hasServeScript: !!packageJson.scripts?.serve,
       devScript,
       isViteProject,
+      isNextProject,
       viteInDevDeps: !!packageJson.devDependencies?.vite,
       viteInDeps: !!packageJson.dependencies?.vite
     })
@@ -390,7 +392,115 @@ export async function serveApp(sandboxPath: string, jobId: string): Promise<Serv
       }
     }
 
-    // For non-Vite projects, build and serve static files
+    // For Next.js projects, run the dev server directly
+    if (isNextProject) {
+      logger.job(jobId, 'Starting Next.js dev server...')
+
+      // Install dependencies first
+      const installProcess = spawn('bun', ['install'], {
+        cwd: sandboxPath,
+        shell: true,
+      })
+
+      let installSuccess = false
+      await new Promise<void>((resolve, reject) => {
+        installProcess.on('close', (code) => {
+          if (code === 0) {
+            installSuccess = true
+            resolve()
+          } else {
+            reject(new Error(`Dependency installation failed with code ${code}`))
+          }
+        })
+      })
+
+      if (!installSuccess) {
+        errors.push('Dependency installation failed')
+        return { success: false, logs, errors }
+      }
+
+      // Start Next.js dev server
+      const port = 3000 + Math.floor(Math.random() * 1000)
+      const url = `http://localhost:${port}`
+
+      const devProcess = spawn('bun', ['run', 'dev', '--', '-H', '0.0.0.0', '-p', port.toString()], {
+        cwd: sandboxPath,
+        shell: true,
+      })
+
+      let validated = false
+      let validationTimeout: NodeJS.Timeout
+
+      devProcess.stdout?.on('data', (data) => {
+        const output = data.toString()
+        logs.push(`[DEV] ${output}`)
+        
+        // Check for Next.js ready signals
+        if (output.includes('Ready in') || output.includes('Local:') || output.includes('started server')) {
+          if (!validated) {
+            validated = true
+            clearTimeout(validationTimeout)
+            logger.success(`Next.js app running at ${url}`)
+          }
+        }
+      })
+
+      devProcess.stderr?.on('data', (data) => {
+        const output = data.toString()
+        logs.push(`[DEV] ${output}`)
+      })
+
+      // Set up validation timeout
+      validationTimeout = setTimeout(() => {
+        if (!validated) {
+          logger.error('Next.js dev server validation timeout')
+          errors.push('Next.js dev server failed to start within timeout')
+          try { devProcess.kill() } catch {}
+        }
+      }, 30000) // 30 second timeout
+
+      // Wait for server to be ready
+      await new Promise<void>((resolve, reject) => {
+        const checkInterval = setInterval(() => {
+          if (validated) {
+            clearInterval(checkInterval)
+            clearTimeout(validationTimeout)
+            resolve()
+          }
+        }, 1000)
+
+        // Also resolve after 35 seconds regardless
+        setTimeout(() => {
+          clearInterval(checkInterval)
+          if (validated) {
+            resolve()
+          } else {
+            reject(new Error('Next.js dev server startup timeout'))
+          }
+        }, 35000)
+      })
+
+      if (!validated) {
+        logger.error('Next.js dev server validation failed')
+        errors.push('Next.js dev server failed to start properly')
+        try { devProcess.kill() } catch {}
+        return {
+          success: false,
+          logs,
+          errors,
+        }
+      }
+
+      return {
+        success: true,
+        url,
+        process: devProcess,
+        logs,
+        errors,
+      }
+    }
+
+    // For non-Vite/Next.js projects, build and serve static files
     logger.job(jobId, 'Installing dependencies...')
     const installProcess = spawn('bun', ['install'], {
       cwd: sandboxPath,

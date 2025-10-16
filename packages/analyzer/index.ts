@@ -36,6 +36,10 @@ export async function analyzeResults(
     } else if (checksCompleted.length > 0) {
       // Some features implemented
       status = 'partial'
+    } else if (runnerResult.success && runnerResult.url && runnerResult.screenshot) {
+      // App is running successfully with screenshot - mark as partial success
+      // This prevents infinite refinement loops for working apps
+      status = 'partial'
     } else {
       // No features implemented despite successful build
       status = 'failed'

@@ -419,11 +419,11 @@ function validateAndFixDependencies(files: GeneratedFile[]): GeneratedFile[] {
   return files
 }
 
-export async function generateCode(task: Task): Promise<GeneratedFile[]> {
+export async function generateCode(task: Task, appDetails?: any): Promise<GeneratedFile[]> {
   try {
     // Try simple template-first approach (for HTML snippets)
     logger.job(task.jobId, 'Checking for simple template match...')
-    const simpleTemplateResult = tryGenerateFromTemplate(task)
+    const simpleTemplateResult = await tryGenerateFromTemplate(task, appDetails)
     
     if (simpleTemplateResult) {
       logger.success('✅ Generated from simple template!')

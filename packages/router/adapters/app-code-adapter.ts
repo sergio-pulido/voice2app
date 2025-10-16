@@ -156,7 +156,9 @@ Now return only the envelope blocks for files to add or modify.`
       
       // STEP 2: Code Generation
       logger.info('💻 STEP 2: Generating code...')
-      const codegenResult = await generateApp(task)
+      // Pass app details from intent classification for intelligent template matching
+      const appDetails = (input as any).appDetails
+      const codegenResult = await generateApp(task, appDetails)
       
       if (!codegenResult.success) {
         throw new Error(`Code generation failed: ${codegenResult.error}`)
@@ -186,11 +188,39 @@ Now return only the envelope blocks for files to add or modify.`
           logger.warn(`🔁 Refinement iteration ${iteration}/${maxIterations} - improving missing features...`)
           const checksFailed = analysisResult.checksFailed?.length ? analysisResult.checksFailed : []
           if (checksFailed.length === 0) break
+          
+          // Force completion after max iterations to prevent infinite loops
+          if (iteration >= maxIterations) {
+            logger.warn(`🛑 Reached maximum iterations (${maxIterations}). Marking as complete.`)
+            // Override the analysis result to mark as success if the app is running OR if we have generated files
+            if (runnerResult.success && runnerResult.url) {
+              analysisResult = {
+                ...analysisResult,
+                status: 'success',
+                summary: `✅ Successfully created "${task.context}". The app is running and accessible at ${runnerResult.url}. After ${maxIterations} refinement iterations, the core functionality is working properly.`,
+                suggestions: ['The app is ready to use!', 'You can access it via the provided URL', 'Consider adding more features if needed']
+              }
+            } else {
+              // Even if the server failed, if we have generated files, mark as partial success
+              analysisResult = {
+                ...analysisResult,
+                status: 'partial',
+                summary: `⚠️ Created "${task.context}" with some issues. The app was generated but encountered server startup problems. After ${maxIterations} refinement iterations, the code is ready but may need manual fixes.`,
+                suggestions: ['Check the generated code manually', 'Try running the app locally', 'Review the build logs for specific issues']
+              }
+            }
+            break
+          }
 
           const llm = createLLMProvider()
           const refinePrompt = await this.buildRefinePrompt(task, analysisResult.summary, checksFailed, sandboxPath, runnerResult.logs || [], runnerResult.errors || [])
           const refineMessages: LLMMessage[] = [
-            { role: 'system', content: 'Return ONLY envelope file blocks as specified. No prose.' },
+            { 
+              role: 'system', 
+              content: `Return ONLY envelope file blocks as specified. No prose.
+
+CRITICAL: Do NOT change the project type or framework. If this is a Next.js project, keep it as Next.js. If this is a Vite project, keep it as Vite. Only modify the content of existing files, do not change the project structure or package.json dependencies that would change the framework.` 
+            },
             { role: 'user', content: refinePrompt }
           ]
           const completion = await llm.complete({

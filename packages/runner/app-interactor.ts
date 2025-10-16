@@ -55,14 +55,14 @@ export async function testAppWithInteraction(
 
     const page = await context.newPage()
     
-    // Navigate to app
+    // Navigate to app with longer timeout for games
     await page.goto(url, {
-      waitUntil: 'networkidle',
-      timeout: 10000,
+      waitUntil: 'domcontentloaded',
+      timeout: 30000,
     })
     
-    // Wait for app to load
-    await page.waitForTimeout(2000)
+    // Wait for app to load, longer for games
+    await page.waitForTimeout(5000)
     
     // Generate test based on user request, app context, screenshot, and code
     const test = await generateTestFromRequest(userRequest, appContext, screenshotPath, appCode)
@@ -146,70 +146,78 @@ export async function testAppWithInteraction(
 }
 
 async function executeStep(page: any, step: InteractionStep): Promise<void> {
-  switch (step.type) {
-    case 'type':
-      if (step.selector && step.text) {
-        try {
-          // Try to find and fill the input with timeout
-          await page.fill(step.selector, step.text, { timeout: 5000 })
-        } catch (error) {
-          logger.warn(`Could not fill selector ${step.selector}: ${error}`)
-          // Try alternative selectors
+  try {
+    switch (step.type) {
+      case 'type':
+        if (step.selector && step.text) {
           try {
-            await page.fill('input:first-of-type', step.text, { timeout: 2000 })
-          } catch (e) {
-            logger.warn('Alternative input selector also failed')
+            // Try to find and fill the input with longer timeout
+            await page.fill(step.selector, step.text, { timeout: 10000 })
+          } catch (error) {
+            logger.warn(`Could not fill selector ${step.selector}: ${error}`)
+            // Try alternative selectors
+            try {
+              await page.fill('input:first-of-type', step.text, { timeout: 5000 })
+            } catch (e) {
+              logger.warn('Alternative input selector also failed')
+            }
           }
         }
-      }
-      break
-    case 'select':
-      if (step.selector && (step.option || step.optionText)) {
-        try {
-          if (step.option) {
-            // Select by value
-            await page.selectOption(step.selector, step.option, { timeout: 5000 })
-          } else if (step.optionText) {
-            // Select by text
-            await page.selectOption(step.selector, { label: step.optionText }, { timeout: 5000 })
-          }
-        } catch (error) {
-          logger.warn(`Could not select option in ${step.selector}: ${error}`)
-        }
-      }
-      break
-    case 'click':
-      if (step.selector) {
-        try {
-          await page.click(step.selector, { timeout: 5000 })
-        } catch (error) {
-          logger.warn(`Could not click selector ${step.selector}: ${error}`)
-          // Try alternative selectors
+        break
+      case 'select':
+        if (step.selector && (step.option || step.optionText)) {
           try {
-            await page.click('button:first-of-type', { timeout: 2000 })
-          } catch (e) {
-            logger.warn('Alternative button selector also failed')
+            if (step.option) {
+              // Select by value
+              await page.selectOption(step.selector, step.option, { timeout: 10000 })
+            } else if (step.optionText) {
+              // Select by text
+              await page.selectOption(step.selector, { label: step.optionText }, { timeout: 10000 })
+            }
+          } catch (error) {
+            logger.warn(`Could not select option in ${step.selector}: ${error}`)
           }
         }
-      }
-      break
-    case 'wait':
-      await page.waitForTimeout(step.duration || 1000)
-      break
-    case 'scroll':
-      if (step.direction) {
-        await page.keyboard.press(`Arrow${step.direction.charAt(0).toUpperCase() + step.direction.slice(1)}`)
-      }
-      break
-    case 'keyboard':
-      if (step.text) {
-        // Allow comma-separated key chords, e.g., "Control+K, Enter"
-        const combos = step.text.split(',').map(s => s.trim()).filter(Boolean)
-        for (const combo of combos) {
-          await page.keyboard.press(combo)
+        break
+      case 'click':
+        if (step.selector) {
+          try {
+            await page.click(step.selector, { timeout: 10000 })
+          } catch (error) {
+            logger.warn(`Could not click selector ${step.selector}: ${error}`)
+            // Try alternative selectors for games
+            try {
+              // For games, try clicking the canvas or any clickable element
+              await page.click('canvas, button:first-of-type, .game-area, .canvas', { timeout: 5000 })
+            } catch (e) {
+              logger.warn('Alternative click selectors also failed')
+            }
+          }
         }
-      }
-      break
+        break
+      case 'wait':
+        await page.waitForTimeout(step.duration || 2000)
+        break
+      case 'scroll':
+        if (step.direction) {
+          await page.keyboard.press(`Arrow${step.direction.charAt(0).toUpperCase() + step.direction.slice(1)}`)
+        }
+        break
+      case 'keyboard':
+        if (step.text) {
+          // Allow comma-separated key chords, e.g., "Control+K, Enter"
+          const combos = step.text.split(',').map(s => s.trim()).filter(Boolean)
+          for (const combo of combos) {
+            await page.keyboard.press(combo)
+            // Small delay between key presses for games
+            await page.waitForTimeout(100)
+          }
+        }
+        break
+    }
+  } catch (error) {
+    logger.error(`Step execution failed: ${error}`)
+    // Continue with next step instead of failing completely
   }
 }
 
@@ -231,9 +239,16 @@ async function generateTestFromRequest(userRequest: string, appContext: string, 
       analysisContext += `App Code (truncated): ${truncatedCode}\n`
     }
 
-    const systemPrompt = `You are an expert at analyzing web applications and generating automated test steps. 
+    const systemPrompt = `You are an expert at analyzing web applications and generating automated test steps, especially for games and interactive apps.
 
 Given an app context, user request, and optionally a screenshot/code, generate a JSON test plan that will interact with the app and demonstrate its functionality.
+
+IMPORTANT FOR GAMES:
+- Use keyboard actions for game controls (Space, ArrowUp, ArrowDown, etc.)
+- Click on canvas elements for touch/mouse interactions
+- Include wait times between actions for game responsiveness
+- For jumping games, use Space or ArrowUp keys
+- For obstacle avoidance, include multiple jump attempts
 
 Return ONLY valid JSON with this exact structure:
 {
@@ -249,22 +264,29 @@ Return ONLY valid JSON with this exact structure:
       "duration": 1000 (for wait actions)
     }
   ],
-  "waitAfter": 2000
+  "waitAfter": 3000
 }
 
 Available action types:
-- click: Click on an element
+- click: Click on an element (use for canvas, buttons)
 - type: Type text into an input field
 - select: Select an option from dropdown
-- wait: Wait for specified duration (ms)
+- wait: Wait for specified duration (ms) - use longer times for games
 - scroll: Scroll in direction
-- keyboard: Press keyboard keys
+- keyboard: Press keyboard keys (Space, ArrowUp, ArrowDown, etc.)
 
 For selectors, use:
 - CSS selectors when possible
+- For games: "canvas", ".game-area", ".canvas", "button"
 - Text-based selectors like "button:has-text('Calculate')"
 - Generic selectors like "input[type='number']:first-of-type"
 - Multiple fallback selectors separated by commas
+
+For game testing:
+- Use keyboard actions for controls (Space for jump, Arrow keys for movement)
+- Include wait times of 1-3 seconds between actions
+- Click on canvas for touch interactions
+- Test multiple game actions to demonstrate gameplay
 
 Make the test realistic and demonstrate the app's main functionality based on the user's request.`;
     
@@ -320,12 +342,17 @@ Make the test realistic and demonstrate the app's main functionality based on th
     } catch (parseError) {
       logger.error('Failed to parse LLM test plan:', parseError)
       logger.debug('LLM response:', response.content)
-      return null
+      
+      // Fallback: generate a simple game test based on the request
+      return generateFallbackGameTest(userRequest, appContext)
     }
     
   } catch (error) {
     logger.error('Failed to generate test from LLM:', error)
-    return null
+    
+    // Fallback: generate a simple game test based on the request
+    logger.info('Using fallback test generation due to LLM error')
+    return generateFallbackGameTest(userRequest, appContext)
   }
 }
 
@@ -343,4 +370,103 @@ async function convertToMp4(webmPath: string, mp4Path: string): Promise<void> {
 function extractNumbers(text: string): number[] {
   const numbers = text.match(/\d+/g)
   return numbers ? numbers.map(Number) : []
+}
+
+function generateFallbackGameTest(userRequest: string, appContext: string): AppTest {
+  const request = userRequest.toLowerCase()
+  
+  // Game-specific fallback tests
+  if (request.includes('jump') || request.includes('obstacle')) {
+    return {
+      description: 'Test jumping over obstacles in the game',
+      steps: [
+        {
+          type: 'wait',
+          duration: 2000
+        },
+        {
+          type: 'keyboard',
+          text: 'Space'
+        },
+        {
+          type: 'wait',
+          duration: 1000
+        },
+        {
+          type: 'keyboard',
+          text: 'Space'
+        },
+        {
+          type: 'wait',
+          duration: 1000
+        },
+        {
+          type: 'keyboard',
+          text: 'Space'
+        },
+        {
+          type: 'wait',
+          duration: 2000
+        }
+      ],
+      waitAfter: 3000
+    }
+  }
+  
+  if (request.includes('click') || request.includes('tap')) {
+    return {
+      description: 'Test clicking/tapping on the game canvas',
+      steps: [
+        {
+          type: 'wait',
+          duration: 2000
+        },
+        {
+          type: 'click',
+          selector: 'canvas'
+        },
+        {
+          type: 'wait',
+          duration: 1000
+        },
+        {
+          type: 'click',
+          selector: 'canvas'
+        },
+        {
+          type: 'wait',
+          duration: 2000
+        }
+      ],
+      waitAfter: 3000
+    }
+  }
+  
+  // Default game test
+  return {
+    description: 'Test basic game interactions',
+    steps: [
+      {
+        type: 'wait',
+        duration: 2000
+      },
+      {
+        type: 'keyboard',
+        text: 'Space'
+      },
+      {
+        type: 'wait',
+        duration: 1000
+      },
+      {
+        type: 'click',
+        selector: 'canvas'
+      },
+      {
+        type: 'wait',
+        duration: 2000
+      }
+    ],
+    waitAfter: 3000
+  }
 }

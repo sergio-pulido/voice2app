@@ -4,7 +4,7 @@
 
 import { logger, config } from '../shared'
 import { detectIntent, getCategoryName, getCategoryEmoji, type IntentCategory } from './intent-router'
-import { qaAdapter, appCodeAdapter, appInteractionAdapter, imageAdapter, videoAdapter, translateAdapter, helpAdapter, friendAdapter, projectManagerAdapter, appAnalyzerAdapter } from './adapters'
+import { qaAdapter, appCodeAdapter, appInteractionAdapter, imageAdapter, videoAdapter, translateAdapter, helpAdapter, friendAdapter, projectManagerAdapter, appAnalyzerAdapter, promptEnhancerAdapter } from './adapters'
 import type { AdapterInput, AdapterOutput } from './types'
 
 // Import STT functionality
@@ -86,7 +86,8 @@ export async function routeRequest(input: AdapterInput): Promise<AdapterOutput> 
     text: intent.category === 'translate' ? textToProcess : normalizedText,
     transcription,
     originalText: textToProcess, // Keep original for reference
-    detectedLang
+    detectedLang,
+    appDetails: intent.appDetails // Pass structured app details for intelligent template matching
   }
   
   switch (intent.category) {
@@ -103,6 +104,10 @@ export async function routeRequest(input: AdapterInput): Promise<AdapterOutput> 
           break
         case 'app_analyzer':
           result = await appAnalyzerAdapter.run(adapterInput)
+          break
+          
+        case 'prompt_enhancer':
+          result = await promptEnhancerAdapter.run(adapterInput)
           break
       
     case 'qa':
@@ -139,6 +144,7 @@ export async function routeRequest(input: AdapterInput): Promise<AdapterOutput> 
   // Add routing metadata
   result.metadata = {
     ...result.metadata,
+    category: intent.category,
     routedTo: intent.category,
     routingConfidence: intent.confidence,
     transcription,
