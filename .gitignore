@@ -151,3 +151,5 @@ data/
 !sandbox/.gitkeep
 !artifacts/.gitkeep
 !data/.gitkeep.DS_Store
+
+.DS_Store
