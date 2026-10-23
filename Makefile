@@ -128,3 +128,13 @@ clean: kill-all
 	@echo ""
 	@echo "✨ Clean complete!"
 
+structure:
+	@echo "📊 Generating detailed project structure..."
+	@if command -v tree >/dev/null 2>&1; then \
+		tree -I 'node_modules|.next|dist|.git|bun.lockb|pnpm-lock.yaml' -L 4 --dirsfirst > structure.txt; \
+		echo "✅ Detailed structure created with tree!"; \
+	else \
+		find . -not -path "*/node_modules/*" -not -path "*/.next/*" -not -path "*/dist/*" -not -path "*/.git/*" -not -path "*/bun.lockb" | sort > structure.txt; \
+		echo "✅ Structure created with find (install 'tree' for better formatting)"; \
+	fi
+	@echo "📄 Structure saved to structure.txt"
