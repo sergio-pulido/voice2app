@@ -150,6 +150,6 @@ artifacts/
 data/
 !sandbox/.gitkeep
 !artifacts/.gitkeep
-!data/.gitkeep.DS_Store
+!data/.gitkeep
 
 .DS_Store
